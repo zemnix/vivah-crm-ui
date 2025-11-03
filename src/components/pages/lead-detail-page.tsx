@@ -1,0 +1,489 @@
+import { useState, useEffect } from "react";
+import { DashboardLayout } from "@/components/layouts/dashboard-layout";
+import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import { StatusBadge } from "@/components/ui/status-badge";
+import { Timeline } from "@/components/ui/timeline";
+import { InteractionDialog } from "@/components/dialogs/interaction-dialog";
+import { useLeadStore } from "@/store/leadStore";
+import { useUserStore } from "@/store/admin/userStore";
+import { getLeadActivitiesApi, getActivityTypeLabel } from "@/api/activityApi";
+import { updateLeadApi } from "@/api/leadApi";
+import type { Activity } from "@/api/activityApi";
+import { ArrowLeft, Plus, FileText, Mail, Building2, User, Phone, Trash2, MoreHorizontal } from "lucide-react";
+import { useNavigate, useParams } from "react-router-dom";
+import { Skeleton } from "@/components/ui/skeleton";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import type { LeadStatus } from "@/api/leadApi";
+import { useToast } from "@/hooks/use-toast";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
+import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
+import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
+
+interface LeadDetailPageProps {
+  readonly userRole: 'admin' | 'staff';
+  readonly backPath: string;
+  readonly testId: string;
+}
+
+export default function LeadDetailPage({
+  userRole,
+  backPath,
+  testId
+}: LeadDetailPageProps) {
+  const [interactionDialogOpen, setInteractionDialogOpen] = useState(false);
+  const [activities, setActivities] = useState<Activity[]>([]);
+  const [activitiesLoading, setActivitiesLoading] = useState(false);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const navigate = useNavigate();
+  const { id } = useParams<{ id: string }>();
+  const { toast } = useToast();
+
+  const {
+    selectedLead: lead,
+    loading: isLoading,
+    fetchLeadById,
+    updateLeadStatusOptimistic,
+    deleteLead,
+    clearError
+  } = useLeadStore();
+
+  const { users, fetchAllUsers } = useUserStore();
+
+  useEffect(() => {
+    const loadLead = async () => {
+      if (id) {
+        setLocalError(null);
+        const result = await fetchLeadById(id);
+        if (!result) {
+          setLocalError("Lead not found or you don't have access to it");
+        }
+      }
+    };
+
+    loadLead();
+
+    return () => {
+      clearError();
+    };
+  }, [id, fetchLeadById, clearError]);
+
+  // Fetch staff members for admin
+  useEffect(() => {
+    if (userRole === 'admin') {
+      fetchAllUsers();
+    }
+  }, [userRole, fetchAllUsers]);
+
+
+  // Fetch activities when lead is loaded
+  useEffect(() => {
+    const fetchActivities = async () => {
+      if (lead?._id) {
+        setActivitiesLoading(true);
+        try {
+          const activityData = await getLeadActivitiesApi(lead._id);
+          setActivities(activityData);
+        } catch (error) {
+          console.error('Failed to fetch activities:', error);
+        } finally {
+          setActivitiesLoading(false);
+        }
+      }
+    };
+
+    fetchActivities();
+  }, [lead?._id]);
+
+  const handleStatusChange = async (newStatus: LeadStatus) => {
+    if (!lead) return;
+
+    const { success, error: optError } = await updateLeadStatusOptimistic(lead._id, newStatus);
+
+    if (success) {
+      toast({
+        title: "Success",
+        description: `Lead status updated to ${newStatus.replace('_', ' ')}`,
+      });
+    } else {
+      let message = optError;
+      if (!message) {
+        try {
+          await updateLeadApi(lead._id, { status: newStatus });
+        } catch (e) {
+          message = e instanceof Error ? e.message : 'Failed to update lead status';
+        }
+      }
+      toast({
+        title: "Invalid Status Change",
+        description: message || 'Failed to update lead status',
+        variant: "destructive",
+      });
+    }
+  };
+
+  const handleScheduleInteraction = () => {
+    setInteractionDialogOpen(true);
+  };
+
+  const handleCreateQuotation = () => {
+    navigate(`/${userRole}/quotations/new?leadId=${lead?._id}`);
+  };
+
+  const handleDelete = () => {
+    setDeleteDialogOpen(true);
+  };
+
+  const handleConfirmDelete = async () => {
+    if (!lead) return;
+
+    setIsDeleting(true);
+    try {
+      await deleteLead(lead._id);
+      toast({
+        title: "Success",
+        description: "Lead deleted successfully",
+      });
+      navigate(backPath);
+    } catch (error) {
+      console.error('Error deleting lead:', error);
+      toast({
+        title: "Error",
+        description: "Failed to delete lead",
+        variant: "destructive",
+      });
+    } finally {
+      setIsDeleting(false);
+      setDeleteDialogOpen(false);
+    }
+  };
+
+  const handleAssign = () => {
+    setAssignDialogOpen(true);
+  };
+
+
+  // Map activity types to timeline types
+  const mapActivityToTimelineType = (activityType: Activity['type']): 'call' | 'meeting' | 'note' | 'status' | 'quotation' => {
+    switch (activityType) {
+      case 'interaction':
+        return 'call';
+      case 'quotation':
+        return 'quotation';
+      case 'status_change':
+        return 'status';
+      case 'service_request':
+        return 'meeting';
+      default:
+        return 'note';
+    }
+  };
+
+  // Create timeline items from activities
+  const timelineItems = [
+    ...activities.map(activity => ({
+      id: activity._id,
+      title: getActivityTypeLabel(activity.type),
+      description: activity.description || `${getActivityTypeLabel(activity.type)} activity`,
+      timestamp: new Date(activity.createdAt),
+      type: mapActivityToTimelineType(activity.type),
+      user: activity.userId?.name
+    })),
+    // Lead assignment item
+    {
+      id: 'assigned',
+      title: 'Lead Assigned',
+      description: 'Lead was assigned to you',
+      timestamp: lead ? new Date(lead.createdAt) : new Date(),
+      type: 'note' as const,
+      user: lead?.createdBy?.name || 'System'
+    }
+  ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  if (isLoading) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="flex items-center gap-4 mb-6">
+            <Skeleton className="h-8 w-8" />
+            <Skeleton className="h-8 w-48" />
+          </div>
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            <div className="lg:col-span-2 space-y-6">
+              <Skeleton className="h-64 w-full" />
+              <Skeleton className="h-32 w-full" />
+            </div>
+            <div>
+              <Skeleton className="h-96 w-full" />
+            </div>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (localError) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-foreground">Lead Not Found</h2>
+            <p className="text-muted-foreground mt-2">{localError}</p>
+            <Button onClick={() => navigate(backPath)} className="mt-4">
+              Back to Leads
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  if (!lead) {
+    return (
+      <DashboardLayout>
+        <div className="p-6">
+          <div className="text-center py-12">
+            <h2 className="text-2xl font-bold text-foreground">Lead Not Found</h2>
+            <p className="text-muted-foreground mt-2">The lead you're looking for doesn't exist or you don't have access to it.</p>
+            <Button onClick={() => navigate(backPath)} className="mt-4">
+              Back to Leads
+            </Button>
+          </div>
+        </div>
+      </DashboardLayout>
+    );
+  }
+
+  return (
+    <DashboardLayout>
+      <div className="p-2 sm:p-3 lg:p-4" data-testid={testId}>
+        {/* Header */}
+        <div className="flex items-center justify-between mb-6">
+          <div className="flex items-center gap-4">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => navigate(backPath)}
+              data-testid="back-button"
+            >
+              <ArrowLeft className="h-4 w-4 mr-2" />
+              Back to Leads
+            </Button>
+            <div>
+              <h1 className="text-3xl font-bold text-foreground">{lead.name}</h1>
+              <p className="text-muted-foreground">{lead.location || 'No location provided'}</p>
+            </div>
+          </div>
+          <div className="flex gap-2">
+            {
+              userRole !== 'admin' && (
+                <div className="flex gap-4">
+                  <Button
+                    variant="outline"
+                    onClick={handleCreateQuotation}
+                    data-testid="new-quotation-button"
+                  >
+                    <FileText className="mr-2 h-4 w-4" />
+                    New Quotation
+                  </Button>
+                  <Button
+                    onClick={handleScheduleInteraction}
+                    data-testid="schedule-interaction-button"
+                  >
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Call & Meeting
+                  </Button>
+                </div>)
+            }
+
+            {/* Admin Actions */}
+            {userRole === 'admin' && (
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <Button variant="outline" size="sm">
+                    <MoreHorizontal className="h-4 w-4" />
+                  </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleAssign}>
+                    Assign to Staff
+                  </DropdownMenuItem>
+                  <DropdownMenuSeparator />
+                  <DropdownMenuItem
+                    onClick={handleDelete}
+                    className="text-red-600 focus:text-red-600"
+                  >
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Delete
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
+            )}
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Lead Information */}
+          <div className="lg:col-span-2 space-y-6">
+            <Card>
+              <CardHeader>
+                <CardTitle>Lead Information</CardTitle>
+              </CardHeader>
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Email</p>
+                      <p className="text-sm text-muted-foreground">{lead.email || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Phone className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Mobile</p>
+                      <p className="text-sm text-muted-foreground">{lead.mobile || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Location</p>
+                      <p className="text-sm text-muted-foreground">{lead.location || 'Not provided'}</p>
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <User className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Source</p>
+                      <p className="text-sm text-muted-foreground">{lead.source || 'Not specified'}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">District</p>
+                  <p className="text-sm text-muted-foreground">{lead.district || 'Not specified'}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Machine Name</p>
+                  <p className="text-sm text-muted-foreground">{lead.machineName || 'Not specified'}</p>
+                </div>
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Status</p>
+                  <div className="flex items-center gap-4">
+                    <StatusBadge status={lead.status} type="lead" />
+                    <Select value={lead.status} onValueChange={handleStatusChange}>
+                      <SelectTrigger className="w-48" data-testid="status-select">
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="new">New</SelectItem>
+                        <SelectItem value="details_sent">Details Sent</SelectItem>
+                        <SelectItem value="followup">Follow Up</SelectItem>
+                        <SelectItem value="not_interested">Not Interested</SelectItem>
+                        <SelectItem value="deal_done">Deal Done</SelectItem>
+                        <SelectItem value="lost">Lost</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+
+                {lead.description && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Description</p>
+                    <p className="text-sm text-muted-foreground">{lead.description}</p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Created By</p>
+                  <p className="text-sm text-muted-foreground">
+                    {lead.createdBy ? `${lead.createdBy.name} (${lead.createdBy.role})` : 'System'}
+                  </p>
+                </div>
+
+                {/* Assigned To - Only for admin */}
+                {userRole === 'admin' && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Assigned To</p>
+                    <p className="text-sm text-muted-foreground">
+                      {lead.assignedTo ? `${lead.assignedTo.name} (${lead.assignedTo.role})` : 'Unassigned'}
+                    </p>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </div>
+
+          {/* Activity Timeline */}
+          <div>
+            <Card className="h-fit">
+              <CardHeader className="pb-3">
+                <CardTitle className="text-lg">Activity Timeline</CardTitle>
+              </CardHeader>
+              <CardContent className="p-0">
+                <div
+                  className="max-h-[60vh] overflow-y-auto px-6 pb-6 scrollbar-thin scrollbar-track-gray-100 scrollbar-thumb-gray-300 hover:scrollbar-thumb-gray-400"
+                  style={{
+                    scrollbarWidth: 'thin',
+                    scrollbarColor: '#d1d5db #f3f4f6'
+                  }}
+                >
+                  {activitiesLoading ? (
+                    <div className="space-y-4">
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                      <Skeleton className="h-12 w-full" />
+                    </div>
+                  ) : (
+                    <Timeline items={timelineItems} />
+                  )}
+                </div>
+              </CardContent>
+            </Card>
+          </div>
+        </div>
+
+        <InteractionDialog
+          open={interactionDialogOpen}
+          onOpenChange={setInteractionDialogOpen}
+          defaultLeadId={lead._id}
+        />
+
+        {/* Delete Confirmation Dialog */}
+        <DeleteConfirmationDialog
+          open={deleteDialogOpen}
+          onOpenChange={setDeleteDialogOpen}
+          onConfirm={handleConfirmDelete}
+          title="Delete Lead"
+          description="Are you sure you want to delete this lead? This action cannot be undone."
+          itemName={lead?.name || ""}
+          itemType="lead"
+          isLoading={isDeleting}
+        />
+
+        {/* Assign Lead Dialog - Only for admin */}
+        {userRole === 'admin' && (
+          <AssignLeadDialog
+            open={assignDialogOpen}
+            onOpenChange={setAssignDialogOpen}
+            lead={lead}
+            staffMembers={users || []}
+            onSuccess={() => {
+              // Refresh lead data after successful assignment
+              if (lead?._id) {
+                fetchLeadById(lead._id);
+              }
+            }}
+          />
+        )}
+      </div>
+    </DashboardLayout>
+  );
+}
