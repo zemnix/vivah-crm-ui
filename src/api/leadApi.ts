@@ -1,19 +1,30 @@
 import apiClient from './apiClient';
 
+// Customer types based on backend model
+export interface Customer {
+  name: string;
+  email?: string;
+  mobile: string;
+  dateOfBirth: string; // ISO date string
+  whatsappNumber: string;
+  address: string;
+  venueEmail?: string;
+}
+
+// Types of Event based on backend model
+export interface TypeOfEvent {
+  name: string;
+  date: string; // ISO date string
+  dayNight: 'day' | 'night' | 'both';
+  numberOfGuests: number;
+}
+
 // Lead types based on backend model
 export interface Lead {
   _id: string;
-  id: string;
-  name: string;
-  location?: string;
-  district?: string;
-  state?: string;
-  pinCode?: number;
-  source?: string;
-  email?: string;
-  mobile?: string;
-  machineName?: string;
-  description?: string;
+  customer: Customer;
+  typesOfEvent?: TypeOfEvent[];
+  baraatDetails?: Record<string, string | number | null>; // Map of field keys to values
   status: LeadStatus;
   createdBy: {
     _id: string;
@@ -33,38 +44,24 @@ export interface Lead {
 
 export type LeadStatus = 
   | 'new'
-  | 'details_sent'
-  | 'followup'
+  | 'follow_up'
   | 'not_interested'
   | 'quotation_sent'
-  | 'deal_done'
+  | 'converted'
   | 'lost';
 
 export interface LeadCreateData {
-  name: string;
-  location: string;
-  district: string;
-  state?: string;
-  pinCode?: number;
-  source: string;
-  email?: string;
-  mobile: string;
-  machineName: string;
-  description?: string;
+  customer: Customer;
+  typesOfEvent?: TypeOfEvent[];
+  baraatDetails?: Record<string, string | number | null>;
+  status?: LeadStatus;
   assignedTo?: string;
 }
 
 export interface LeadUpdateData {
-  name?: string;
-  location?: string;
-  district?: string;
-  state?: string;
-  pinCode?: number;
-  source?: string;
-  email?: string;
-  mobile?: string;
-  machineName?: string;
-  description?: string;
+  customer?: Partial<Customer>;
+  typesOfEvent?: TypeOfEvent[];
+  baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   assignedTo?: string;
 }
@@ -78,6 +75,26 @@ export interface LeadQueryParams {
   dateFrom?: string; // ISO date string
   dateTo?: string; // ISO date string
 }
+
+// Helper to get customer name from lead (for backward compatibility)
+export const getLeadName = (lead: Lead): string => {
+  return lead.customer?.name || '';
+};
+
+// Helper to get customer mobile from lead (for backward compatibility)
+export const getLeadMobile = (lead: Lead): string => {
+  return lead.customer?.mobile || '';
+};
+
+// Helper to get customer email from lead (for backward compatibility)
+export const getLeadEmail = (lead: Lead): string => {
+  return lead.customer?.email || '';
+};
+
+// Helper to get location from lead (for backward compatibility - may need to be updated)
+export const getLeadLocation = (lead: Lead): string => {
+  return lead.customer?.address || '';
+};
 
 export interface LeadListResponse {
   leads: Lead[];
@@ -142,11 +159,10 @@ export const searchLeadsApi = async (searchQuery: string): Promise<Lead[]> => {
 export const getLeadStatusColor = (status: LeadStatus): string => {
   const colors: Record<LeadStatus, string> = {
     'new': 'bg-blue-100 text-blue-800',
-    'details_sent': 'bg-purple-100 text-purple-800',
-    'followup': 'bg-yellow-100 text-yellow-800',
+    'follow_up': 'bg-yellow-100 text-yellow-800',
     'not_interested': 'bg-red-100 text-red-800',
     'quotation_sent': 'bg-indigo-100 text-indigo-800',
-    'deal_done': 'bg-green-100 text-green-800',
+    'converted': 'bg-green-100 text-green-800',
     'lost': 'bg-gray-100 text-gray-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
@@ -156,11 +172,10 @@ export const getLeadStatusColor = (status: LeadStatus): string => {
 export const getLeadStatusLabel = (status: LeadStatus): string => {
   const labels: Record<LeadStatus, string> = {
     'new': 'New',
-    'details_sent': 'Details Sent',
-    'followup': 'Follow Up',
+    'follow_up': 'Follow Up',
     'not_interested': 'Not Interested',
     'quotation_sent': 'Quotation Sent',
-    'deal_done': 'Deal Done',
+    'converted': 'Converted',
     'lost': 'Lost',
   };
   return labels[status] || status;

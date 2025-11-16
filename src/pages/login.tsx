@@ -37,9 +37,6 @@ export default function LoginPage() {
         case 'staff':
           navigate('/staff/leads');
           break;
-        case 'worker':
-          navigate('/worker/tracking');
-          break;
         default:
           navigate('/login');
       }

@@ -1,16 +1,18 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { StatusBadge } from "@/components/ui/status-badge";
+import { Badge } from "@/components/ui/badge";
 import { Timeline } from "@/components/ui/timeline";
 import { InteractionDialog } from "@/components/dialogs/interaction-dialog";
 import { useLeadStore } from "@/store/leadStore";
 import { useUserStore } from "@/store/admin/userStore";
+import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { getLeadActivitiesApi, getActivityTypeLabel } from "@/api/activityApi";
-import { updateLeadApi } from "@/api/leadApi";
+import { updateLeadApi, getLeadName, getLeadEmail, getLeadMobile, getLeadLocation } from "@/api/leadApi";
 import type { Activity } from "@/api/activityApi";
-import { ArrowLeft, Plus, FileText, Mail, Building2, User, Phone, Trash2, MoreHorizontal } from "lucide-react";
+import { ArrowLeft, Plus, FileText, Mail, Building2, Phone, Trash2, MoreHorizontal, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -19,6 +21,7 @@ import { useToast } from "@/hooks/use-toast";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
+import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
 
 interface LeadDetailPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -38,6 +41,7 @@ export default function LeadDetailPage({
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
+  const [editDialogOpen, setEditDialogOpen] = useState(false);
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
@@ -52,6 +56,7 @@ export default function LeadDetailPage({
   } = useLeadStore();
 
   const { users, fetchAllUsers } = useUserStore();
+  const { activeFields, fetchActiveFields } = useBaraatConfigStore();
 
   useEffect(() => {
     const loadLead = async () => {
@@ -77,6 +82,11 @@ export default function LeadDetailPage({
       fetchAllUsers();
     }
   }, [userRole, fetchAllUsers]);
+
+  // Fetch active baraat field configs to display custom fields
+  useEffect(() => {
+    fetchActiveFields();
+  }, [fetchActiveFields]);
 
 
   // Fetch activities when lead is loaded
@@ -165,6 +175,10 @@ export default function LeadDetailPage({
     setAssignDialogOpen(true);
   };
 
+  const handleEdit = () => {
+    setEditDialogOpen(true);
+  };
+
 
   // Map activity types to timeline types
   const mapActivityToTimelineType = (activityType: Activity['type']): 'call' | 'meeting' | 'note' | 'status' | 'quotation' => {
@@ -202,6 +216,35 @@ export default function LeadDetailPage({
       user: lead?.createdBy?.name || 'System'
     }
   ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
+
+  // Prepare baraat details for display
+  const baraatDetailsItems = useMemo(() => {
+    if (!lead?.baraatDetails || Object.keys(lead.baraatDetails).length === 0) {
+      return [];
+    }
+
+    // Create a map of field keys to field configs for quick lookup
+    const fieldMap = new Map(activeFields.map(field => [field.key, field]));
+    
+    // Get all keys from baraatDetails and sort by field order
+    const detailKeys = Object.keys(lead.baraatDetails);
+    const sortedKeys = detailKeys
+      .map(key => {
+        const field = fieldMap.get(key);
+        return { key, field, order: field?.order ?? 999 };
+      })
+      .sort((a, b) => a.order - b.order);
+
+    return sortedKeys.map(({ key, field }) => {
+      const value = lead.baraatDetails?.[key];
+      const label = field?.label || key;
+      const displayValue = value !== null && value !== undefined && value !== '' 
+        ? String(value) 
+        : 'Not provided';
+
+      return { key, label, displayValue };
+    });
+  }, [lead?.baraatDetails, activeFields]);
 
   if (isLoading) {
     return (
@@ -273,8 +316,8 @@ export default function LeadDetailPage({
               Back to Leads
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-foreground">{lead.name}</h1>
-              <p className="text-muted-foreground">{lead.location || 'No location provided'}</p>
+              <h1 className="text-3xl font-bold text-foreground">{getLeadName(lead)}</h1>
+              <p className="text-muted-foreground">{getLeadLocation(lead) || 'No location provided'}</p>
             </div>
           </div>
           <div className="flex gap-2">
@@ -308,6 +351,9 @@ export default function LeadDetailPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
+                  <DropdownMenuItem onClick={handleEdit}>
+                    Edit Lead
+                  </DropdownMenuItem>
                   <DropdownMenuItem onClick={handleAssign}>
                     Assign to Staff
                   </DropdownMenuItem>
@@ -321,6 +367,17 @@ export default function LeadDetailPage({
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
+            )}
+
+            {/* Staff Actions - Edit button */}
+            {userRole === 'staff' && (
+              <Button
+                variant="outline"
+                onClick={handleEdit}
+                data-testid="edit-lead-button"
+              >
+                Edit Lead
+              </Button>
             )}
           </div>
         </div>
@@ -338,41 +395,55 @@ export default function LeadDetailPage({
                     <Mail className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium text-foreground">Email</p>
-                      <p className="text-sm text-muted-foreground">{lead.email || 'Not provided'}</p>
+                      <p className="text-sm text-muted-foreground">{getLeadEmail(lead) || 'Not provided'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Phone className="h-5 w-5 text-muted-foreground" />
                     <div>
                       <p className="text-sm font-medium text-foreground">Mobile</p>
-                      <p className="text-sm text-muted-foreground">{lead.mobile || 'Not provided'}</p>
+                      <p className="text-sm text-muted-foreground">{getLeadMobile(lead) || 'Not provided'}</p>
                     </div>
                   </div>
                   <div className="flex items-center gap-3">
                     <Building2 className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">Location</p>
-                      <p className="text-sm text-muted-foreground">{lead.location || 'Not provided'}</p>
+                      <p className="text-sm font-medium text-foreground">Address</p>
+                      <p className="text-sm text-muted-foreground">{lead.customer?.address || 'Not provided'}</p>
                     </div>
                   </div>
+                  {lead.customer?.whatsappNumber && (
+                    <div className="flex items-center gap-3">
+                      <Phone className="h-5 w-5 text-muted-foreground" />
+                      <div>
+                        <p className="text-sm font-medium text-foreground">WhatsApp</p>
+                        <p className="text-sm text-muted-foreground">{lead.customer.whatsappNumber}</p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {lead.customer?.dateOfBirth && (
                   <div className="flex items-center gap-3">
-                    <User className="h-5 w-5 text-muted-foreground" />
+                    <Calendar className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">Source</p>
-                      <p className="text-sm text-muted-foreground">{lead.source || 'Not specified'}</p>
+                      <p className="text-sm font-medium text-foreground">Date of Birth</p>
+                      <p className="text-sm text-muted-foreground">
+                        {new Date(lead.customer.dateOfBirth).toLocaleDateString()}
+                      </p>
                     </div>
                   </div>
-                </div>
+                )}
 
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">District</p>
-                  <p className="text-sm text-muted-foreground">{lead.district || 'Not specified'}</p>
-                </div>
-
-                <div className="space-y-2">
-                  <p className="text-sm font-medium text-foreground">Machine Name</p>
-                  <p className="text-sm text-muted-foreground">{lead.machineName || 'Not specified'}</p>
-                </div>
+                {lead.customer?.venueEmail && (
+                  <div className="flex items-center gap-3">
+                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <div>
+                      <p className="text-sm font-medium text-foreground">Venue Email</p>
+                      <p className="text-sm text-muted-foreground">{lead.customer.venueEmail}</p>
+                    </div>
+                  </div>
+                )}
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Status</p>
@@ -384,22 +455,15 @@ export default function LeadDetailPage({
                       </SelectTrigger>
                       <SelectContent>
                         <SelectItem value="new">New</SelectItem>
-                        <SelectItem value="details_sent">Details Sent</SelectItem>
-                        <SelectItem value="followup">Follow Up</SelectItem>
+                        <SelectItem value="follow_up">Follow Up</SelectItem>
                         <SelectItem value="not_interested">Not Interested</SelectItem>
-                        <SelectItem value="deal_done">Deal Done</SelectItem>
+                        <SelectItem value="quotation_sent">Quotation Sent</SelectItem>
+                        <SelectItem value="converted">Converted</SelectItem>
                         <SelectItem value="lost">Lost</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-
-                {lead.description && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Description</p>
-                    <p className="text-sm text-muted-foreground">{lead.description}</p>
-                  </div>
-                )}
 
                 <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Created By</p>
@@ -419,6 +483,79 @@ export default function LeadDetailPage({
                 )}
               </CardContent>
             </Card>
+
+            {/* Events Information */}
+            {lead.typesOfEvent && lead.typesOfEvent.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Events</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {lead.typesOfEvent.map((event, index) => (
+                      <div
+                        key={index}
+                        className="p-4 border rounded-lg bg-muted/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">{event.name}</h4>
+                          <Badge variant="secondary" className="text-xs">
+                            {event.numberOfGuests} {event.numberOfGuests === 1 ? 'guest' : 'guests'}
+                          </Badge>
+                        </div>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3 text-sm">
+                          <div className="flex items-center gap-2">
+                            <Calendar className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Event Date</p>
+                              <p className="text-foreground font-medium">
+                                {event.date
+                                  ? new Date(event.date).toLocaleDateString('en-US', {
+                                      year: 'numeric',
+                                      month: 'long',
+                                      day: 'numeric',
+                                    })
+                                  : 'Not set'}
+                              </p>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2">
+                            <div className="h-4 w-4 flex items-center justify-center">
+                              <span className="text-muted-foreground">🌙</span>
+                            </div>
+                            <div>
+                              <p className="text-xs text-muted-foreground">Day/Night</p>
+                              <p className="text-foreground font-medium capitalize">
+                                {event.dayNight || 'both'}
+                              </p>
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
+            {/* Baraat Details (Custom Fields) */}
+            {baraatDetailsItems.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>Baraat Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {baraatDetailsItems.map(({ key, label, displayValue }) => (
+                      <div key={key} className="space-y-1">
+                        <p className="text-sm font-medium text-foreground">{label}</p>
+                        <p className="text-sm text-muted-foreground">{displayValue}</p>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
           </div>
 
           {/* Activity Timeline */}
@@ -463,7 +600,7 @@ export default function LeadDetailPage({
           onConfirm={handleConfirmDelete}
           title="Delete Lead"
           description="Are you sure you want to delete this lead? This action cannot be undone."
-          itemName={lead?.name || ""}
+          itemName={lead ? getLeadName(lead) : ""}
           itemType="lead"
           isLoading={isDeleting}
         />
@@ -481,6 +618,21 @@ export default function LeadDetailPage({
                 fetchLeadById(lead._id);
               }
             }}
+          />
+        )}
+
+        {/* Edit Lead Dialog - For admin and staff */}
+        {(userRole === 'admin' || userRole === 'staff') && (
+          <LeadEditDialog
+            open={editDialogOpen}
+            onOpenChange={(open) => {
+              setEditDialogOpen(open);
+              // Refresh lead data after closing dialog (in case it was updated)
+              if (!open && lead?._id) {
+                fetchLeadById(lead._id);
+              }
+            }}
+            lead={lead}
           />
         )}
       </div>

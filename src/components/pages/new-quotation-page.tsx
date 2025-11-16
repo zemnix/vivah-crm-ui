@@ -8,14 +8,11 @@ import { SearchableLeadSelect } from "@/components/ui/searchable-lead-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
-import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import { useAuthStore } from "@/store/authStore";
 import { useQuotationStore } from "@/store/quotationStore";
 import { useToast } from "@/hooks/use-toast";
 import { getLeadByIdApi } from "@/api/leadApi";
 import { ArrowLeft, Plus, Trash2, Save } from "lucide-react";
-import { useMachineStore } from "@/store/machineStore";
-import type { Machine } from "@/lib/schema";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useForm, useFieldArray } from "react-hook-form";
@@ -70,7 +67,6 @@ export default function NewQuotationPage({
   const { user } = useAuthStore();
   const { createQuotation } = useQuotationStore();
   const { toast } = useToast();
-  const { searchMachines, createMachine } = useMachineStore();
   
   const [selectedLeadId, setSelectedLeadId] = useState(preSelectedLeadId || "");
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -107,17 +103,6 @@ export default function NewQuotationPage({
     name: "additionalCharges"
   });
 
-  // Product search/typeahead state per row
-  const [productQueryByIndex, setProductQueryByIndex] = useState<Record<number, string>>({});
-  const [productResultsByIndex, setProductResultsByIndex] = useState<Record<number, Machine[]>>({});
-  const [productLoadingByIndex, setProductLoadingByIndex] = useState<Record<number, boolean>>({});
-  const productSearchTimers = useState<Record<number, any>>({})[0];
-
-  // Confirmation dialog state
-  const [isCreateProductDialogOpen, setIsCreateProductDialogOpen] = useState(false);
-  const [newProductName, setNewProductName] = useState("");
-  const [newProductDescription, setNewProductDescription] = useState("");
-  const [currentProductIndex, setCurrentProductIndex] = useState<number | null>(null);
 
   // Set the pre-selected lead when component mounts
   useEffect(() => {
@@ -307,47 +292,6 @@ export default function NewQuotationPage({
     }
   };
 
-  const handleCreateProduct = (index: number, name: string) => {
-    setNewProductName(name);
-    setNewProductDescription("");
-    setCurrentProductIndex(index);
-    setIsCreateProductDialogOpen(true);
-  };
-
-  const confirmCreateProduct = async () => {
-    if (currentProductIndex === null || !newProductName.trim()) return;
-
-    try {
-      const created = await createMachine({ 
-        name: newProductName.trim(), 
-        description: newProductDescription.trim() 
-      });
-      
-      if (created) {
-        updateItem(currentProductIndex, 'productName', created.name);
-        updateItem(currentProductIndex, 'description', created.description || '');
-        setProductResultsByIndex(prev => ({ ...prev, [currentProductIndex]: [] }));
-        setProductQueryByIndex(prev => ({ ...prev, [currentProductIndex]: '' }));
-        
-        toast({
-          title: "Success",
-          description: `Product "${created.name}" created successfully`,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to create product:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create product. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreateProductDialogOpen(false);
-      setNewProductName("");
-      setNewProductDescription("");
-      setCurrentProductIndex(null);
-    }
-  };
 
   return (
     <DashboardLayout>
@@ -520,77 +464,11 @@ export default function NewQuotationPage({
                           return (
                               <TableRow key={field.id}>
                               <TableCell>
-                                <Popover open={(productQueryByIndex[index]?.length ?? 0) >= 3}>
-                                  <PopoverAnchor asChild>
-                                    <Input
-                                      value={item.productName}
-                                      onChange={(e) => {
-                                        const q = e.target.value;
-                                        updateItem(index, 'productName', q);
-                                        setProductQueryByIndex(prev => ({ ...prev, [index]: q }));
-                                        if (productSearchTimers[index]) clearTimeout(productSearchTimers[index]);
-                                        productSearchTimers[index] = setTimeout(async () => {
-                                          if (!q || q.trim().length < 3) {
-                                            setProductResultsByIndex(prev => ({ ...prev, [index]: [] }));
-                                            setProductLoadingByIndex(prev => ({ ...prev, [index]: false }));
-                                            return;
-                                          }
-                                          setProductLoadingByIndex(prev => ({ ...prev, [index]: true }));
-                                          const results = await searchMachines(q.trim());
-                                          setProductResultsByIndex(prev => ({ ...prev, [index]: results }));
-                                          setProductLoadingByIndex(prev => ({ ...prev, [index]: false }));
-                                        }, 300);
-                                      }}
-                                      placeholder="Search product..."
-                                    />
-                                  </PopoverAnchor>
-                                  <PopoverContent 
-                                    className="w-[24rem] max-h-60 overflow-auto p-0" 
-                                    align="start"
-                                    onOpenAutoFocus={(e) => e.preventDefault()}
-                                  >
-                                    {productLoadingByIndex[index] && (
-                                      <div className="p-2 text-sm text-muted-foreground">Searching...</div>
-                                    )}
-                                    {!productLoadingByIndex[index] && (productResultsByIndex[index]?.length ?? 0) > 0 && (
-                                      productResultsByIndex[index]!.map((m) => (
-                                        <button
-                                          key={m._id}
-                                          type="button"
-                                          className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                                          onClick={() => {
-                                            updateItem(index, 'productName', m.name);
-                                            updateItem(index, 'description', m.description || '');
-                                            setProductResultsByIndex(prev => ({ ...prev, [index]: [] }));
-                                            setProductQueryByIndex(prev => ({ ...prev, [index]: '' }));
-                                          }}
-                                        >
-                                          <div className="font-medium">{m.name}</div>
-                                          {m.description && (
-                                            <div className="text-xs text-muted-foreground line-clamp-2">{m.description}</div>
-                                          )}
-                                        </button>
-                                      ))
-                                    )}
-
-                                    {!productLoadingByIndex[index] && (productResultsByIndex[index]?.length ?? 0) === 0 && productQueryByIndex[index]?.length >= 3 && (
-                                      <div className="p-2">
-                                        <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                        <Button
-                                          type="button"
-                                          size="sm"
-                                          className="cursor-pointer"
-                                          onClick={() => {
-                                            const name = productQueryByIndex[index];
-                                            handleCreateProduct(index, name);
-                                          }}
-                                        >
-                                          Create "{productQueryByIndex[index]}"
-                                        </Button>
-                                      </div>
-                                    )}
-                                  </PopoverContent>
-                                </Popover>
+                                <Input
+                                  value={item.productName}
+                                  onChange={(e) => updateItem(index, 'productName', e.target.value)}
+                                  placeholder="Enter product name"
+                                />
                               </TableCell>
                               <TableCell>
                                 <Input
@@ -831,53 +709,6 @@ export default function NewQuotationPage({
         </div>
       </div>
 
-      {/* Create Product Confirmation Dialog */}
-      <Dialog open={isCreateProductDialogOpen} onOpenChange={setIsCreateProductDialogOpen}>
-        <DialogContent>
-          <DialogHeader>
-            <DialogTitle>Create New Product</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <div>
-              <Label htmlFor="product-name">Product Name</Label>
-              <Input
-                className="mt-2"
-                id="product-name"
-                value={newProductName}
-                onChange={(e) => setNewProductName(e.target.value)}
-                placeholder="Enter product name"
-              />
-            </div>
-            <div>
-              <Label htmlFor="product-description">Description</Label>
-              <Textarea
-                className="mt-2"
-                id="product-description"
-                value={newProductDescription}
-                onChange={(e) => setNewProductDescription(e.target.value)}
-                placeholder="Enter product description"
-                rows={3}
-              />
-            </div>
-          </div>
-          <DialogFooter>
-            <Button
-              className="cursor-pointer"
-              variant="outline"
-              onClick={() => setIsCreateProductDialogOpen(false)}
-            >
-              Cancel
-            </Button>
-            <Button
-              className="cursor-pointer"
-              onClick={confirmCreateProduct}
-              disabled={!newProductName.trim()}
-            >
-              Create Product
-            </Button>
-          </DialogFooter>
-        </DialogContent>
-      </Dialog>
     </DashboardLayout>
   );
 }

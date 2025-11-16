@@ -1,23 +1,30 @@
 import { useAuthStore } from "@/store/authStore";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { cn } from "@/lib/utils";
 import { Link, useLocation } from "react-router-dom";
+import { useTheme } from "@/providers/theme-provider";
 import { 
   Users, 
   MessageSquare, 
   LayoutDashboard,
-  ClipboardList,
   FileText,
-  X
+  Settings,
+  X,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList
 } from "lucide-react";
 
 interface SidebarProps {
   readonly onClose?: () => void;
   readonly collapsed?: boolean;
+  readonly onToggleCollapse?: () => void;
 }
 
-export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
+export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: SidebarProps) {
   const { user } = useAuthStore();
+  const { theme } = useTheme();
   const location = useLocation();
 
   if (!user) return null;
@@ -25,9 +32,11 @@ export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
   const adminMenuItems = [
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/leads", icon: Users, label: "Leads" },
+    { href: "/admin/converted-leads", icon: Users, label: "Converted Leads" },
+    { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/admin/interactions", icon: MessageSquare, label: "Calls & Meetings" },
     { href: "/admin/quotations", icon: FileText, label: "Quotations" },
-    { href: "/worker/tracking", icon: ClipboardList, label: "Work Tracking" },
+    { href: "/admin/master-config", icon: Settings, label: "Master Config" },
     // { href: "/admin/staff", icon: UserCheck, label: "Staff" },
     // { href: "/admin/reports", icon: BarChart3, label: "Reports" },
   ];
@@ -35,19 +44,16 @@ export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
   const staffMenuItems = [
     { href: "/staff/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/staff/leads", icon: Users, label: "My Leads" },
+    { href: "/staff/converted-leads", icon: Users, label: "Converted Leads" },
+    { href: "/staff/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/staff/interactions", icon: MessageSquare, label: "Calls & Meetings" },
     { href: "/staff/quotations", icon: FileText, label: "Quotations" },
-  ];
-
-  const workerMenuItems = [
-    { href: "/worker/tracking", icon: ClipboardList, label: "Work Tracking" },
   ];
 
   const getMenuItems = () => {
     switch (user.role) {
       case 'admin': return adminMenuItems;
       case 'staff': return staffMenuItems;
-      case 'worker': return workerMenuItems;
       default: return [];
     }
   };
@@ -55,9 +61,19 @@ export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
   const menuItems = getMenuItems();
 
   return (
-    <div className="flex flex-col h-full" data-testid="sidebar">
-      {/* Mobile close button at top */}
-      <div className="flex justify-end p-2 md:hidden">
+    <div className="flex flex-col h-full relative" data-testid="sidebar" style={{ backgroundColor: 'var(--sidebar)' }}>
+      {/* Mobile header with logo and close button */}
+      <div className="flex items-center justify-between p-3 md:hidden border-b border-sidebar-border">
+        <div className={cn(
+          "flex items-center flex-shrink-0 rounded-md p-1.5",
+          theme === 'light' ? "bg-gray-900" : ""
+        )}>
+          <img
+            src="/vinayak_enterprise_logo.jpeg"
+            alt="Vinayak Enterprise"
+            className="h-8 w-auto object-contain"
+          />
+        </div>
         <Button
           variant="ghost"
           size="sm"
@@ -70,7 +86,7 @@ export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
 
       {/* Navigation Menu */}
       <nav className={cn(
-        "flex-1 p-2 sm:p-4 space-y-1 sm:space-y-2",
+        "flex-1 p-2 sm:p-4 space-y-1 sm:space-y-2 overflow-y-auto",
         collapsed ? "p-2" : ""
       )} data-testid="sidebar-nav">
         {menuItems.map((item) => {
@@ -78,41 +94,105 @@ export function Sidebar({ onClose, collapsed = false }: SidebarProps) {
           const isActive = location.pathname === item.href || 
             (item.href !== '/' && location.pathname.startsWith(item.href));
           
-          const handleClick = () => {
-            // Always navigate to the page, regardless of collapsed state
-            onClose?.();
+          const handleClick = (e: React.MouseEvent) => {
+            // Only close sidebar on mobile (not on desktop)
+            // On desktop, clicking menu items should not affect collapsed state
+            // Check if we're on mobile by checking if the sidebar is in overlay mode
+            const isMobile = window.matchMedia('(max-width: 768px)').matches;
+            if (isMobile) {
+              onClose?.();
+            }
+            // Prevent any side effects on desktop
+            e.stopPropagation();
           };
+
+          const menuItemContent = (
+            <div className={cn(
+              "flex items-center text-sm font-medium rounded-md transition-colors",
+              collapsed ? "justify-center p-2 sm:p-3" : "px-2 sm:px-3 py-2",
+              isActive 
+                ? "bg-primary/10 text-primary" 
+                : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+            )}>
+              <Icon className={cn(
+                "h-4 w-4 flex-shrink-0 transition-all duration-500 ease-in-out",
+                collapsed ? "" : "mr-2 sm:mr-3"
+              )} />
+              <span className={cn(
+                "truncate text-xs sm:text-sm transition-all duration-500 ease-in-out",
+                collapsed 
+                  ? "opacity-0 w-0 overflow-hidden" 
+                  : "opacity-100 w-auto"
+              )}>
+                {item.label}
+              </span>
+            </div>
+          );
+
+          if (collapsed) {
+            return (
+              <Tooltip key={item.href}>
+                <TooltipTrigger asChild>
+                  <Link to={item.href} onClick={handleClick}>
+                    {menuItemContent}
+                  </Link>
+                </TooltipTrigger>
+                <TooltipContent side="right" sideOffset={8}>
+                  {item.label}
+                </TooltipContent>
+              </Tooltip>
+            );
+          }
 
           return (
             <Link key={item.href} to={item.href} onClick={handleClick}>
-              <div className={cn(
-                "flex items-center text-sm font-medium rounded-md transition-colors group relative",
-                collapsed ? "justify-center p-2 sm:p-3" : "px-2 sm:px-3 py-2",
-                isActive 
-                  ? "bg-primary/10 text-primary" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-muted/50"
-              )}>
-                <Icon className={cn(
-                  "h-4 w-4 flex-shrink-0",
-                  collapsed ? "" : "mr-2 sm:mr-3"
-                )} />
-                {!collapsed && (
-                  <span className="truncate text-xs sm:text-sm">
-                    {item.label}
-                  </span>
-                )}
-                
-                {/* Tooltip for collapsed state */}
-                {collapsed && (
-                  <div className="absolute left-full ml-2 px-2 py-1 bg-popover text-popover-foreground text-xs rounded-md shadow-lg opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none whitespace-nowrap z-50">
-                    {item.label}
-                  </div>
-                )}
-              </div>
+              {menuItemContent}
             </Link>
           );
         })}
       </nav>
+
+      {/* Collapse/Expand Button - Only on desktop, as a menu item at the bottom */}
+      {onToggleCollapse && (
+        <div className={cn(
+          "hidden md:block p-2 sm:p-4 border-t border-sidebar-border",
+          collapsed ? "p-2" : ""
+        )}>
+          {collapsed ? (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <button
+                  onClick={onToggleCollapse}
+                  className={cn(
+                    "w-full flex items-center justify-center text-sm font-medium rounded-md transition-colors",
+                    "p-2 sm:p-3",
+                    "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+                  )}
+                >
+                  <ChevronRight className="h-4 w-4 flex-shrink-0 transition-all duration-500 ease-in-out" />
+                </button>
+              </TooltipTrigger>
+              <TooltipContent side="right" sideOffset={8}>
+                Collapse Sidebar
+              </TooltipContent>
+            </Tooltip>
+          ) : (
+            <button
+              onClick={onToggleCollapse}
+              className={cn(
+                "w-full flex items-center text-sm font-medium rounded-md transition-colors",
+                "px-2 sm:px-3 py-2",
+                "text-muted-foreground hover:text-foreground hover:bg-muted/50"
+              )}
+            >
+              <ChevronLeft className="h-4 w-4 flex-shrink-0 mr-2 sm:mr-3 transition-all duration-500 ease-in-out" />
+              <span className="truncate text-xs sm:text-sm transition-all duration-500 ease-in-out">
+                Collapse Sidebar
+              </span>
+            </button>
+          )}
+        </div>
+      )}
     </div>
   );
 }

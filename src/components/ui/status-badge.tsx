@@ -15,14 +15,13 @@ export function StatusBadge({ status, type, className }: StatusBadgeProps) {
         switch (status as LeadStatus) {
           case 'new': 
             return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200 border-blue-200 dark:border-blue-700';
-          case 'details_sent': 
-            return 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200 border-cyan-200 dark:border-cyan-700';
-          case 'followup': 
+          case 'follow_up': 
             return 'bg-amber-100 text-amber-800 dark:bg-amber-900 dark:text-amber-200 border-amber-200 dark:border-amber-700';
           case 'not_interested': 
             return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200 border-gray-200 dark:border-gray-700';
-          
-          case 'deal_done': 
+          case 'quotation_sent': 
+            return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border-indigo-200 dark:border-indigo-700';
+          case 'converted': 
             return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-700 shadow-sm';
           case 'lost': 
             return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-200 dark:border-red-700';
@@ -87,11 +86,10 @@ export function StatusBadge({ status, type, className }: StatusBadgeProps) {
   const getStatusIcon = () => {
     if (type === 'lead') {
       switch (status as LeadStatus) {
-        case 'deal_done': return '✅ ';
+        case 'converted': return '✅ ';
         case 'lost': return '❌ ';
-        
-        case 'followup': return '🔄 ';
-        case 'details_sent': return '📧 ';
+        case 'follow_up': return '🔄 ';
+        case 'quotation_sent': return '📧 ';
         case 'new': return '🆕 ';
         case 'not_interested': return '⏸️ ';
         default: return '';

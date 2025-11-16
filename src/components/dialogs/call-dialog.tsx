@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
+import { DatePicker } from "@/components/ui/date-picker";
 import { useCreateCall, useLeads } from "@/hooks/useApi";
 import { useAuthStore } from "@/store/authStore";
 import { Play, Square } from "lucide-react";
@@ -211,7 +212,22 @@ export function CallDialog({ open, onOpenChange, leadId }: CallDialogProps) {
                 <FormItem>
                   <FormLabel>Next Follow-up Date</FormLabel>
                   <FormControl>
-                    <Input type="date" {...field} data-testid="next-action-input" />
+                    <DatePicker
+                      date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
+                      onDateChange={(date) => {
+                        // Convert Date to YYYY-MM-DD string format
+                        if (date) {
+                          const year = date.getFullYear();
+                          const month = String(date.getMonth() + 1).padStart(2, '0');
+                          const day = String(date.getDate()).padStart(2, '0');
+                          field.onChange(`${year}-${month}-${day}`);
+                        } else {
+                          field.onChange("");
+                        }
+                      }}
+                      placeholder="Pick a date"
+                      data-testid="next-action-input"
+                    />
                   </FormControl>
                   <FormMessage />
                 </FormItem>

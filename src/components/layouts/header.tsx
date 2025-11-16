@@ -5,7 +5,7 @@ import { useAuthStore } from "@/store/authStore";
 import type { AuthUser } from "@/api/authApi";
 import { useTheme } from "@/providers/theme-provider";
 import { Menu, Moon, Sun, ChevronDown } from "lucide-react";
-import { Link, useLocation, useNavigate } from "react-router-dom";
+import { Link, useNavigate } from "react-router-dom";
 import { cn } from "@/lib/utils";
 
 interface HeaderProps {
@@ -15,84 +15,46 @@ interface HeaderProps {
 }
 
 
-export function Header({ onMenuClick, user, sidebarCollapsed = false }: HeaderProps) {
+export function Header({ onMenuClick, user }: HeaderProps) {
   const { logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
-  const location = useLocation();
   const navigate = useNavigate();
-
-  const getBreadcrumbs = () => {
-    const segments = location.pathname.split('/').filter(Boolean);
-    if (segments.length === 0) return ['Dashboard'];
-
-    const breadcrumbs = [segments[0].charAt(0).toUpperCase() + segments[0].slice(1)];
-    if (segments.length > 1) {
-      breadcrumbs.push(segments[1].charAt(0).toUpperCase() + segments[1].slice(1));
-    }
-    return breadcrumbs;
-  };
 
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
-  const breadcrumbs = getBreadcrumbs();
   const userInitials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
-    <header className="bg-card border-b border-border flex items-center justify-between h-14" data-testid="header">
+    <header className="flex items-center justify-between h-14 w-full px-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
       <div className="flex items-center flex-1 min-w-0">
-        {/* Logo Section - responsive width */}
-        <div className={cn(
-          "bg-card border-r border-border flex items-center justify-center transition-all duration-300",
-          // Mobile: narrow logo section, Desktop: full sidebar width
-          sidebarCollapsed ? "w-16 px-2" : "w-28 sm:w-36 md:w-48 lg:w-60",
-          "px-4 py-3"
-        )}>
-          {sidebarCollapsed ? (
-            <div className="w-8 h-6 bg-primary rounded-lg flex items-center justify-center">
-              <span className="text-primary-foreground font-bold text-xs">VI</span>
-            </div>
-          ) : (
-            <img
-              src="/vinayak_enterprise_logo.jpeg"
-              alt="Vinayak Enterprise"
-              className="h-6 sm:h-8 md:h-10 lg:h-12 w-auto max-w-full object-contain"
-            />
-          )}
-        </div>
-
         {/* Mobile Menu Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={onMenuClick}
-          className="md:hidden ml-1 flex-shrink-0"
+          className="md:hidden mr-3 flex-shrink-0"
           data-testid="menu-button"
         >
           <Menu className="h-4 w-4" />
         </Button>
 
-        {/* Breadcrumb - responsive with truncation */}
-        <nav className="flex items-center text-xs sm:text-sm text-muted-foreground ml-1 sm:ml-2 min-w-0 flex-1" data-testid="breadcrumb">
-          <div className="flex items-center min-w-0">
-            {breadcrumbs.map((crumb, index) => (
-              <div key={`breadcrumb-${crumb}-${index}`} className="flex items-center min-w-0">
-                {index > 0 && <span className="mx-1 sm:mx-2 flex-shrink-0">/</span>}
-                <span className={cn(
-                  index === breadcrumbs.length - 1 ? "text-foreground" : "",
-                  "truncate"
-                )}>
-                  {crumb}
-                </span>
-              </div>
-            ))}
-          </div>
-        </nav>
+        {/* Logo */}
+        <div className={cn(
+          "flex items-center flex-shrink-0 rounded-md p-1.5",
+          // theme === 'light' ? "bg-gray-900" : ""
+        )}>
+          <img
+            src="/vivahlogo.png"
+            alt="Vivah"
+            className="h-8 sm:h-10 w-auto object-contain"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center space-x-0 sm:space-x-0.5 px-0 sm:px-1 py-1 sm:py-2 flex-shrink-0">
+      <div className="flex items-center space-x-2 sm:space-x-3 px-2 sm:px-4 flex-shrink-0">
         {/* Dark Mode Toggle */}
         <Button
           variant="ghost"

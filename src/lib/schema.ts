@@ -1,7 +1,7 @@
 // TypeScript types and constants for the CRM
 
 // Lead status enum - Updated to match backend model
-export const leadStatuses = ['new', 'details_sent', 'followup', 'not_interested', 'quotation_sent', 'deal_done', 'lost'] as const;
+export const leadStatuses = ['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const;
 export type LeadStatus = typeof leadStatuses[number];
 
 // Call/Interaction status enum  

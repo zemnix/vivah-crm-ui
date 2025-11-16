@@ -5,13 +5,11 @@ import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { CalendarIcon, Filter, RefreshCw, Clock, CheckCircle, AlertCircle, Phone, FileText, Send, ThumbsUp, ThumbsDown, MapPin, Users, ArrowRight, DollarSign, ClipboardList } from 'lucide-react';
+import { CalendarIcon, Filter, RefreshCw, Clock, CheckCircle, AlertCircle, Phone, FileText, Send, ThumbsUp, ThumbsDown, MapPin, Users, ArrowRight, DollarSign } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '@/hooks/useDashboard';
 import { DashboardFilters, dashboardApi, Staff } from '@/api/dashboardApi';
-import { getWorkEntryStatsApi } from '@/api/workEntryApi';
-import { useQuery } from '@tanstack/react-query';
 import {
   XAxis,
   YAxis,
@@ -47,13 +45,6 @@ export default function AdminDashboard() {
   const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
-  const [workTrackingMonth, setWorkTrackingMonth] = useState<string>('');
-
-  // Fetch work entry stats
-  const { data: workEntryStats } = useQuery({
-    queryKey: ['workEntryStats', workTrackingMonth],
-    queryFn: () => getWorkEntryStatsApi(workTrackingMonth ? { month: workTrackingMonth } : undefined),
-  });
 
   useEffect(() => {
     console.log('Filters changed, fetching data:', filters);
@@ -337,12 +328,12 @@ export default function AdminDashboard() {
 
   return (
     <DashboardLayout>
-      <div className="space-y-6 p-1 sm:p-2 lg:p-3">
+      <div className="space-y-6 p-4 sm:p-6 lg:p-8">
         {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6">
           <div>
-            <h1 className="text-3xl font-bold tracking-tight">Admin Dashboard</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-3xl font-bold tracking-tight mb-2">Admin Dashboard</h1>
+            <p className="text-muted-foreground text-sm sm:text-base">
               Monitor overall system performance and district-wise analytics
             </p>
           </div>
@@ -355,7 +346,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Filters */}
-          <Card>
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
               <Filter className="h-5 w-5 mr-2" />
@@ -541,7 +532,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Main Feature: District-wise Quotation Analysis */}
-        <Card>
+        <Card className="mb-6">
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
@@ -589,7 +580,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Stats Cards */}
-        <div className="grid gap-6">
+        <div className="grid gap-6 mb-6">
           {/* Leads Stats */}
           <div>
             <h2 className="text-2xl font-bold mb-4">Leads</h2>
@@ -650,7 +641,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Charts */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 mb-6">
           {/* Interaction Timeline */}
           <Card>
             <CardHeader>
@@ -793,80 +784,6 @@ export default function AdminDashboard() {
           </Card>
         </div>
 
-        {/* Work Tracking Charts */}
-        <div>
-          <div className="flex items-center justify-between mb-4">
-            <h2 className="text-2xl font-bold flex items-center">
-              <ClipboardList className="h-6 w-6 mr-2" />
-              Work Tracking
-            </h2>
-            <div className="flex items-center gap-2">
-              <Select value={workTrackingMonth || 'all'} onValueChange={(value) => {
-                setWorkTrackingMonth(value === 'all' ? '' : value);
-              }}>
-                <SelectTrigger className="w-48">
-                  <SelectValue placeholder="Select month" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">All Time</SelectItem>
-                  {generateMonthOptions().map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-          
-          {workEntryStats?.dailyWorkByUnit && workEntryStats.dailyWorkByUnit.length > 0 ? (
-            <Card>
-              <CardHeader>
-                <CardTitle>Daily Work by Units</CardTitle>
-                <CardDescription>
-                  {workTrackingMonth 
-                    ? `Work completed per day in ${generateMonthOptions().find(m => m.value === workTrackingMonth)?.label || workTrackingMonth}`
-                    : 'Total work completed per day across all unit types'
-                  }
-                </CardDescription>
-              </CardHeader>
-              <CardContent>
-                <div className="h-80">
-                  <ResponsiveContainer width="100%" height="100%">
-                    <BarChart 
-                      data={workEntryStats.dailyWorkByUnit
-                        .map(item => ({
-                          ...item,
-                          date: format(new Date(item.date), 'MMM dd')
-                        }))
-                        .reverse()
-                      }
-                    >
-                      <CartesianGrid strokeDasharray="3 3" />
-                      <XAxis dataKey="date" />
-                      <YAxis />
-                      <Tooltip />
-                      <Bar dataKey="kg" stackId="a" fill="#8884d8" name="Kilograms (kg)" />
-                      <Bar dataKey="g" stackId="a" fill="#82ca9d" name="Grams (g)" />
-                      <Bar dataKey="pieces" stackId="a" fill="#ffc658" name="Pieces" />
-                      <Bar dataKey="units" stackId="a" fill="#ff7c7c" name="Units" />
-                      <Bar dataKey="other" stackId="a" fill="#8dd1e1" name="Other" />
-                    </BarChart>
-                  </ResponsiveContainer>
-                </div>
-              </CardContent>
-            </Card>
-          ) : (
-            <Card>
-              <CardContent className="p-12">
-                <div className="text-center text-muted-foreground">
-                  <ClipboardList className="h-12 w-12 mx-auto mb-4 opacity-50" />
-                  <p>No work tracking data available for the selected period</p>
-                </div>
-              </CardContent>
-            </Card>
-          )}
-        </div>
 
       </div>
     </DashboardLayout>

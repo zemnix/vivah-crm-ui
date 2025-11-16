@@ -1,19 +1,33 @@
 import { Sidebar } from "./sidebar";
 import { Header } from "./header";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { useAuthStore } from "@/store/authStore";
-import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight } from "lucide-react";
 
 interface DashboardLayoutProps {
   readonly children: React.ReactNode;
 }
 
+const SIDEBAR_COLLAPSED_KEY = "sidebar-collapsed";
+
 export function DashboardLayout({ children }: DashboardLayoutProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false); // Start closed on mobile
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  // Initialize from localStorage, default to false if not set
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    if (typeof window !== "undefined") {
+      const saved = localStorage.getItem(SIDEBAR_COLLAPSED_KEY);
+      return saved === "true";
+    }
+    return false;
+  });
   const { user, isAuthenticated } = useAuthStore();
+
+  // Persist collapsed state to localStorage whenever it changes
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      localStorage.setItem(SIDEBAR_COLLAPSED_KEY, String(sidebarCollapsed));
+    }
+  }, [sidebarCollapsed]);
 
   // Don't render until we have a user
   if (!isAuthenticated || !user) {
@@ -21,9 +35,9 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
   }
 
   return (
-    <div className="min-h-screen bg-background">
-      {/* Fixed Header */}
-      <div className="fixed top-0 left-0 right-0 z-40 bg-card border-b border-border">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--sidebar)' }}>
+      {/* Fixed Header - Full Width */}
+      <div className="fixed top-0 left-0 right-0 z-40" style={{ backgroundColor: 'var(--navbar)' }}>
         <Header 
           onMenuClick={() => setSidebarOpen(!sidebarOpen)}
           user={user}
@@ -31,66 +45,64 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
         />
       </div>
 
-      {/* Fixed Sidebar for Desktop */}
-      <div className={cn(
-        "bg-card border-r border-border flex-shrink-0 transition-all duration-300 ease-in-out relative",
-        "fixed z-30 h-[calc(100vh-3.5rem)] top-14 left-0", // Updated to match h-14 header
-        // Desktop sidebar width based on collapsed state
-        sidebarCollapsed ? "w-16" : "w-60",
-        // Mobile visibility - hidden by default, shown when open
-        "md:translate-x-0",
-        sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
-      )}>
+      {/* Fixed Sidebar - Full screen on mobile, below header on desktop */}
+      <div 
+        className={cn(
+          "flex-shrink-0 relative",
+          // Smooth transition for all properties
+          "transition-all duration-500 ease-in-out",
+          "will-change-transform",
+          // Mobile: full screen and full width
+          "fixed z-50 top-0 h-screen w-full left-0",
+          // Desktop: below header with specific width
+          "md:z-30 md:top-14 md:h-[calc(100vh-3.5rem)]",
+          sidebarCollapsed ? "md:w-16" : "md:w-60",
+          // Mobile visibility - hidden by default, shown when open
+          "md:translate-x-0",
+          sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
+        )}
+        style={{ backgroundColor: 'var(--sidebar)' }}
+      >
         <Sidebar 
           onClose={() => setSidebarOpen(false)}
           collapsed={sidebarCollapsed}
+          onToggleCollapse={() => setSidebarCollapsed(!sidebarCollapsed)}
         />
-        
-        {/* Collapse/Expand Button - Only on desktop */}
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-          className={cn(
-            "absolute -right-3 bottom-6 z-50",
-            "hidden md:flex h-6 w-6 p-0 rounded-full border border-border bg-card shadow-md",
-            "hover:bg-muted transition-colors"
-          )}
-          title={sidebarCollapsed ? "Expand Sidebar" : "Collapse Sidebar"}
-        >
-          {sidebarCollapsed ? (
-            <ChevronRight className="h-3 w-3" />
-          ) : (
-            <ChevronLeft className="h-3 w-3" />
-          )}
-        </Button>
       </div>
 
       {/* Main content with left margin to account for fixed sidebar */}
       <div className={cn(
-        "mt-14 min-h-[calc(100vh-3.5rem)]", // Updated to match h-14 header
-        // Add left margin for fixed sidebar - responsive to match header logo section
-        sidebarCollapsed ? "md:ml-16" : "ml-0 sm:ml-36 md:ml-48 lg:ml-60"
+        "fixed top-14 bottom-0 left-0 right-0 z-10",
+        // Smooth transition for left position - consistent timing
+        "transition-[left] duration-500 ease-in-out",
+        // Add left margin for fixed sidebar
+        sidebarCollapsed ? "md:left-16" : "md:left-60",
+        // Add padding to create rounded content area
       )}>
-        <main className="bg-background p-1 sm:p-2 lg:p-3">
-          {children}
-        </main>
+        {/* Fixed rounded white container */}
+        <div className="h-full bg-background rounded-xl md:rounded-2xl shadow-sm overflow-hidden flex flex-col">
+          {/* Scrollable content inside */}
+          <main className="flex-1 overflow-y-auto overflow-x-hidden">
+            {children}
+          </main>
+        </div>
       </div>
 
       {/* Mobile backdrop */}
-      {sidebarOpen && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 z-20 md:hidden top-14"
-          onClick={() => setSidebarOpen(false)}
-          onKeyDown={(e) => {
-            if (e.key === 'Escape') {
-              setSidebarOpen(false);
-            }
-          }}
-          role="button"
-          tabIndex={0}
-        />
-      )}
+      <div 
+        className={cn(
+          "fixed inset-0 bg-black z-40 md:hidden transition-opacity duration-500 ease-in-out",
+          sidebarOpen ? "opacity-50" : "opacity-0 pointer-events-none"
+        )}
+        onClick={() => setSidebarOpen(false)}
+        onKeyDown={(e) => {
+          if (e.key === 'Escape') {
+            setSidebarOpen(false);
+          }
+        }}
+        role="button"
+        tabIndex={0}
+      />
     </div>
   );
 }

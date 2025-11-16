@@ -18,7 +18,11 @@ import AdminNewQuotation from "@/pages/admin/quotations/new";
 import AdminStaff from "@/pages/admin/staff";
 import AdminReports from "@/pages/admin/reports";
 import AdminSettings from "@/pages/admin/settings";
-import ProductMaster from "@/pages/admin/product-master";
+import AdminBaraatConfig from "@/pages/admin/baraat-config";
+import AdminEnquiries from "@/pages/admin/enquiries";
+import AdminEventConfig from "@/pages/admin/event-config";
+import AdminMasterConfig from "@/pages/admin/master-config";
+import AdminConvertedLeads from "@/pages/admin/converted-leads";
 import StaffDashboard from "@/pages/staff/dashboard";
 import StaffLeads from "@/pages/staff/leads";
 import StaffLeadDetail from "@/pages/staff/leads/[id]";
@@ -28,7 +32,8 @@ import StaffQuotationDetail from "@/pages/staff/quotations/[id]";
 import QuotationPreview from "@/pages/staff/quotations/preview/[id]";
 import NewQuotation from "@/pages/staff/quotations/new";
 import StaffSettings from "@/pages/staff/settings";
-import WorkerTracking from "@/pages/worker/tracking";
+import StaffEnquiries from "@/pages/staff/enquiries";
+import StaffConvertedLeads from "@/pages/staff/converted-leads";
 import NotFound from "@/pages/not-found";
 import { ThemeProvider } from "./providers/theme-provider";
 import { useNotificationInit } from "./hooks/useNotificationInit";
@@ -76,7 +81,11 @@ function App() {
           <Route path="/admin/staff" element={<AdminStaff />} />
           <Route path="/admin/reports" element={<AdminReports />} />
           <Route path="/admin/settings" element={<AdminSettings />} />
-          <Route path="/product-master" element={<ProductMaster />} />
+          <Route path="/admin/master-config" element={<AdminMasterConfig />} />
+          <Route path="/admin/baraat-config" element={<AdminBaraatConfig />} />
+          <Route path="/admin/event-config" element={<AdminEventConfig />} />
+          <Route path="/admin/enquiries" element={<AdminEnquiries />} />
+          <Route path="/admin/converted-leads" element={<AdminConvertedLeads />} />
 
           {/* Staff Routes */}
           <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
@@ -92,10 +101,9 @@ function App() {
           <Route path="/staff/quotations/:id/preview" element={<QuotationPreview />} />
           <Route path="/staff/quotations/:id" element={<StaffQuotationDetail />} />
           <Route path="/staff/settings" element={<StaffSettings />} />
+          <Route path="/staff/enquiries" element={<StaffEnquiries />} />
+          <Route path="/staff/converted-leads" element={<StaffConvertedLeads />} />
 
-          {/* Worker Routes */}
-          <Route path="/worker" element={<Navigate to="/worker/tracking" replace />} />
-          <Route path="/worker/tracking" element={<WorkerTracking />} />
 
           {/* Root redirect */}
           <Route path="/" element={<Navigate to="/login" replace />} />

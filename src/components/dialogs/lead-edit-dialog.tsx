@@ -14,27 +14,32 @@ import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { useEventConfigStore } from "@/store/eventConfigStore";
-import type { Lead, LeadCreateData, LeadUpdateData, LeadStatus } from "@/api/leadApi";
-import type { BaraatFieldConfig, FieldType } from "@/api/baraatConfigApi";
+import type { Lead, LeadUpdateData, LeadStatus } from "@/api/leadApi";
+import type { BaraatFieldConfig } from "@/api/baraatConfigApi";
 import { useEffect, useState, useMemo } from "react";
-import { Loader, Plus, X } from "lucide-react";
+import { Loader, AlertCircle, Plus, X } from "lucide-react";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 // Customer schema
 const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
   mobile: z.string().regex(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"), // ISO date string
+  dateOfBirth: z.string().min(1, "Date of birth is required"),
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
   venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
 });
 
-// Dynamic baraat details schema - will be built based on active fields
-const createBaraatDetailsSchema = (activeFields: BaraatFieldConfig[]) => {
+// Dynamic baraat details schema - includes all fields (active + inactive) and legacy fields
+const createBaraatDetailsSchema = (
+  allFields: BaraatFieldConfig[],
+  legacyFields: Array<{ key: string; value: any }>
+) => {
   const baraatDetailsShape: Record<string, z.ZodTypeAny> = {};
   
-  activeFields.forEach((field) => {
+  // Add all config fields (active + inactive)
+  allFields.forEach((field) => {
     let fieldSchema: z.ZodTypeAny;
     
     switch (field.type) {
@@ -70,11 +75,29 @@ const createBaraatDetailsSchema = (activeFields: BaraatFieldConfig[]) => {
     baraatDetailsShape[field.key] = fieldSchema;
   });
   
+  // Add legacy fields as optional strings/numbers
+  legacyFields.forEach(({ key, value }) => {
+    if (!baraatDetailsShape[key]) {
+      // Try to infer type from existing value
+      if (typeof value === 'number') {
+        baraatDetailsShape[key] = z.number().optional().or(z.string().transform((val) => {
+          const num = Number(val);
+          return isNaN(num) ? undefined : num;
+        })).optional();
+      } else {
+        baraatDetailsShape[key] = z.string().optional().or(z.literal("")).or(z.null());
+      }
+    }
+  });
+  
   return z.object(baraatDetailsShape).optional();
 };
 
-// Lead form schema
-const createLeadSchema = (activeFields: BaraatFieldConfig[]) => {
+// Lead form schema for editing
+const createLeadEditSchema = (
+  allFields: BaraatFieldConfig[],
+  legacyFields: Array<{ key: string; value: any }>
+) => {
   return z.object({
     customer: customerSchema,
     status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const),
@@ -87,31 +110,55 @@ const createLeadSchema = (activeFields: BaraatFieldConfig[]) => {
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
       })
     ).optional(),
-    baraatDetails: createBaraatDetailsSchema(activeFields),
+    baraatDetails: createBaraatDetailsSchema(allFields, legacyFields),
   });
 };
 
-type LeadForm = z.infer<ReturnType<typeof createLeadSchema>>;
+type LeadEditForm = z.infer<ReturnType<typeof createLeadEditSchema>>;
 
-interface LeadDialogProps {
+interface LeadEditDialogProps {
   open: boolean;
   onOpenChange: (open: boolean) => void;
-  lead?: Lead | null;
-  mode: 'create' | 'edit';
+  lead: Lead | null;
 }
 
-export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) {
-  const { createLead, updateLead, loading } = useLeadStore();
+export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps) {
+  const { updateLead, loading } = useLeadStore();
   const { user } = useAuthStore();
   const { users, fetchAllUsers, loading: usersLoading } = useUserStore();
-  const { activeFields, fetchActiveFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
+  const { fields: allFields, fetchAllFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
   const { events, fetchAllEvents, loading: eventsLoading } = useEventConfigStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sort active fields by order
-  const sortedActiveFields = useMemo(() => {
-    return [...activeFields].sort((a, b) => a.order - b.order);
-  }, [activeFields]);
+  // Detect legacy fields (fields in lead.baraatDetails that are not in config)
+  const legacyFields = useMemo(() => {
+    if (!lead?.baraatDetails) return [];
+    
+    const configFieldKeys = new Set(allFields.map(f => f.key));
+    const legacy: Array<{ key: string; value: any }> = [];
+    
+    Object.entries(lead.baraatDetails).forEach(([key, value]) => {
+      if (!configFieldKeys.has(key)) {
+        legacy.push({ key, value });
+      }
+    });
+    
+    return legacy;
+  }, [lead?.baraatDetails, allFields]);
+
+  // Get fields that the lead has (active + inactive from config)
+  // For editing, we show all config fields (active + inactive) that exist in the lead's data
+  const leadFields = useMemo(() => {
+    if (!lead?.baraatDetails) return [];
+    
+    const leadFieldKeys = new Set(Object.keys(lead.baraatDetails));
+    return allFields.filter(field => leadFieldKeys.has(field.key));
+  }, [lead?.baraatDetails, allFields]);
+
+  // Sort fields by order
+  const sortedLeadFields = useMemo(() => {
+    return [...leadFields].sort((a, b) => a.order - b.order);
+  }, [leadFields]);
 
   // Filter users to get only staff for assignment
   const staffMembers = useMemo(() => 
@@ -119,22 +166,25 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
     [users]
   );
 
-  // Create schema based on active fields
-  const leadSchema = useMemo(() => createLeadSchema(sortedActiveFields), [sortedActiveFields]);
+  // Create schema based on all fields (active + inactive) and legacy fields
+  const leadSchema = useMemo(() => 
+    createLeadEditSchema(allFields, legacyFields), 
+    [allFields, legacyFields]
+  );
 
   // Initialize form with default values
-  const getDefaultValues = (): LeadForm => {
+  const getDefaultValues = (): LeadEditForm => {
     if (lead) {
-      // Convert ISO date string to Date object for DatePicker
-      let dateOfBirthDate: Date | undefined = undefined;
+      // Convert ISO date string to YYYY-MM-DD format for date input
+      let dateOfBirthInput = "";
       if (lead.customer?.dateOfBirth) {
         try {
           const date = new Date(lead.customer.dateOfBirth);
           if (!isNaN(date.getTime())) {
-            dateOfBirthDate = date;
+            dateOfBirthInput = date.toISOString().split('T')[0];
           }
         } catch (e) {
-          // If date parsing fails, leave undefined
+          // If date parsing fails, leave empty
         }
       }
 
@@ -164,7 +214,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           name: lead.customer?.name || "",
           email: lead.customer?.email || "",
           mobile: lead.customer?.mobile || "",
-          dateOfBirth: dateOfBirthDate ? dateOfBirthDate.toISOString().split('T')[0] : "",
+          dateOfBirth: dateOfBirthInput,
           whatsappNumber: lead.customer?.whatsappNumber || "",
           address: lead.customer?.address || "",
           venueEmail: lead.customer?.venueEmail || "",
@@ -192,43 +242,40 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
     };
   };
 
-  const form = useForm<LeadForm>({
+  const form = useForm<LeadEditForm>({
     resolver: zodResolver(leadSchema),
     defaultValues: getDefaultValues(),
   });
 
   // Reset form when lead changes or when fields are loaded
   useEffect(() => {
-    if (open && sortedActiveFields.length >= 0) {
-      // Only reset if we have a lead or if fields are loaded (to avoid resetting during initial load)
-      const shouldReset = lead || sortedActiveFields.length > 0;
+    if (open && allFields.length >= 0) {
+      const shouldReset = lead || allFields.length > 0;
       if (shouldReset) {
         form.reset(getDefaultValues());
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead?._id, sortedActiveFields.length, open]);
+  }, [lead?._id, allFields.length, open]);
 
   // Fetch data when dialog opens
   useEffect(() => {
     if (open) {
       fetchAllUsers({ role: undefined, page: 1, limit: 100 });
-      fetchActiveFields();
+      fetchAllFields(); // Fetch all fields (active + inactive) for editing
       fetchAllEvents();
     }
-  }, [open, fetchAllUsers, fetchActiveFields, fetchAllEvents]);
+  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents]);
 
-  const onSubmit = async (data: LeadForm) => {
-    if (!user) return;
+  const onSubmit = async (data: LeadEditForm) => {
+    if (!user || !lead) return;
 
     setIsSubmitting(true);
     
     try {
       // Prepare customer data
-      // Convert date input (YYYY-MM-DD) to ISO string
       let dateOfBirthISO = data.customer.dateOfBirth;
       if (dateOfBirthISO && dateOfBirthISO.includes('T') === false) {
-        // If it's in YYYY-MM-DD format, convert to ISO
         const date = new Date(dateOfBirthISO + 'T00:00:00');
         if (!isNaN(date.getTime())) {
           dateOfBirthISO = date.toISOString();
@@ -253,10 +300,11 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         numberOfGuests: event.numberOfGuests,
       }));
 
-      // Prepare baraat details - filter out empty values and convert types
+      // Prepare baraat details - include all fields (config + legacy)
       const baraatDetailsData: Record<string, string | number | null> = {};
       if (data.baraatDetails) {
-        sortedActiveFields.forEach((field) => {
+        // Add all config fields
+        allFields.forEach((field) => {
           const value = data.baraatDetails?.[field.key];
           if (value !== undefined && value !== null && value !== '') {
             if (field.type === 'number') {
@@ -268,58 +316,55 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               baraatDetailsData[field.key] = String(value);
             }
           } else if (field.required) {
-            // For required fields, set to null if empty (backend will validate)
             baraatDetailsData[field.key] = null;
+          }
+        });
+        
+        // Add legacy fields
+        legacyFields.forEach(({ key }) => {
+          const value = data.baraatDetails?.[key];
+          if (value !== undefined && value !== null && value !== '') {
+            // Try to preserve type
+            if (typeof value === 'number') {
+              baraatDetailsData[key] = value;
+            } else {
+              const numValue = Number(value);
+              if (!isNaN(numValue) && value !== '') {
+                baraatDetailsData[key] = numValue;
+              } else {
+                baraatDetailsData[key] = String(value);
+              }
+            }
           }
         });
       }
 
-      if (mode === 'create') {
-        const leadData: LeadCreateData = {
-          customer: customerData,
-          typesOfEvent: typesOfEventData,
-          baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
-          status: data.status,
-          ...(user.role === 'staff' 
-            ? { assignedTo: user.id } 
-            : data.assignedTo && { assignedTo: data.assignedTo }
-          ),
-        };
+      // Close dialog immediately to prevent any visual glitches
+      onOpenChange(false);
+      
+      const updateData: LeadUpdateData = {
+        customer: customerData,
+        typesOfEvent: typesOfEventData,
+        baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
+        status: data.status,
+        ...(user.role === 'staff' 
+          ? {} 
+          : data.assignedTo !== undefined && { assignedTo: data.assignedTo }
+        ),
+      };
 
-        const newLead = await createLead(leadData);
-        if (newLead) {
-          form.reset();
-          onOpenChange(false);
-        }
-      } else if (mode === 'edit' && lead) {
-        // Close dialog immediately to prevent any visual glitches
-        onOpenChange(false);
-        
-        const updateData: LeadUpdateData = {
-          customer: customerData,
-          typesOfEvent: typesOfEventData,
-          baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
-          status: data.status,
-          ...(user.role === 'staff' 
-            ? {} 
-            : data.assignedTo !== undefined && { assignedTo: data.assignedTo }
-          ),
-        };
-
-        // Perform the update after closing
-        const updatedLead = await updateLead(lead._id, updateData);
-        if (!updatedLead) {
-          console.error('Failed to update lead');
-        }
-        
-        setIsSubmitting(false);
-        return; // Early return to prevent the finally block
+      // Perform the update after closing
+      const updatedLead = await updateLead(lead._id, updateData);
+      if (!updatedLead) {
+        console.error('Failed to update lead');
       }
+      
+      setIsSubmitting(false);
+      return;
     } catch (error) {
-      console.error('Error saving lead:', error);
+      console.error('Error updating lead:', error);
     } finally {
-      // Only set submitting to false if we didn't return early
-      if (mode !== 'edit') {
+      if (!isSubmitting) {
         setIsSubmitting(false);
       }
     }
@@ -342,6 +387,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               <FormItem>
                 <FormLabel>
                   {field.label} {field.required && '*'}
+                  {!field.isActive && (
+                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
+                  )}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -366,6 +414,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               <FormItem>
                 <FormLabel>
                   {field.label} {field.required && '*'}
+                  {!field.isActive && (
+                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
+                  )}
                 </FormLabel>
                 <FormControl>
                   <Input
@@ -395,6 +446,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               <FormItem>
                 <FormLabel>
                   {field.label} {field.required && '*'}
+                  {!field.isActive && (
+                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
+                  )}
                 </FormLabel>
                 <FormControl>
                   <Textarea
@@ -420,6 +474,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               <FormItem>
                 <FormLabel>
                   {field.label} {field.required && '*'}
+                  {!field.isActive && (
+                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
+                  )}
                 </FormLabel>
                 <Select
                   onValueChange={formField.onChange}
@@ -449,11 +506,57 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
     }
   };
 
+  // Render legacy field (simple text input)
+  const renderLegacyField = (legacyField: { key: string; value: any }) => {
+    const fieldName = `baraatDetails.${legacyField.key}` as const;
+    const isNumber = typeof legacyField.value === 'number';
+    
+    return (
+      <FormField
+        key={legacyField.key}
+        control={form.control}
+        name={fieldName}
+        render={({ field: formField }) => (
+          <FormItem>
+            <FormLabel className="text-amber-600 dark:text-amber-500">
+              {legacyField.key} <span className="text-xs text-muted-foreground">(Legacy)</span>
+            </FormLabel>
+            <FormControl>
+              {isNumber ? (
+                <Input
+                  type="number"
+                  placeholder={`Enter ${legacyField.key}`}
+                  {...formField}
+                  value={formField.value || ''}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    formField.onChange(value ? Number(value) : undefined);
+                  }}
+                />
+              ) : (
+                <Input
+                  placeholder={`Enter ${legacyField.key}`}
+                  {...formField}
+                  value={formField.value || ''}
+                />
+              )}
+            </FormControl>
+            <FormMessage />
+          </FormItem>
+        )}
+      />
+    );
+  };
+
+  if (!lead) {
+    return null;
+  }
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="lead-dialog">
+      <DialogContent className="w-[95vw] max-w-3xl max-h-[90vh] overflow-y-auto" data-testid="lead-edit-dialog">
         <DialogHeader>
-          <DialogTitle className="text-lg sm:text-xl">{mode === 'create' ? 'Add New Lead' : 'Edit Lead'}</DialogTitle>
+          <DialogTitle className="text-lg sm:text-xl">Edit Lead</DialogTitle>
         </DialogHeader>
 
         {baraatFieldsLoading ? (
@@ -463,7 +566,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           </div>
         ) : (
           <Form {...form}>
-            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" data-testid="lead-form">
+            <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6" data-testid="lead-edit-form">
               {/* Customer Information Section */}
               <div className="space-y-4">
                 <h3 className="text-lg font-semibold">Customer Information</h3>
@@ -778,12 +881,31 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                 )}
               </div>
 
-              {/* Baraat Details Section */}
-              {sortedActiveFields.length > 0 && (
+              {/* Baraat Details Section - Config Fields */}
+              {sortedLeadFields.length > 0 && (
                 <div className="space-y-4">
                   <h3 className="text-lg font-semibold">Baraat Details</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {sortedActiveFields.map((field) => renderBaraatField(field))}
+                    {sortedLeadFields.map((field) => renderBaraatField(field))}
+                  </div>
+                </div>
+              )}
+
+              {/* Legacy Fields Section */}
+              {legacyFields.length > 0 && (
+                <div className="space-y-4">
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-lg font-semibold">Legacy Fields</h3>
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                  </div>
+                  <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
+                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                    <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
+                      These fields are not in the current configuration but exist in this lead's data. You can edit them freely.
+                    </AlertDescription>
+                  </Alert>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {legacyFields.map((legacyField) => renderLegacyField(legacyField))}
                   </div>
                 </div>
               )}
@@ -861,15 +983,15 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                 <Button
                   type="submit"
                   disabled={isPending}
-                  data-testid="save-lead-button"
+                  data-testid="update-lead-button"
                 >
                   {isPending ? (
                     <>
                       <Loader className="animate-spin mr-2" size={16} />
-                      {mode === 'create' ? "Creating..." : "Updating..."}
+                      Updating...
                     </>
                   ) : (
-                    mode === 'create' ? "Create Lead" : "Update Lead"
+                    "Update Lead"
                   )}
                 </Button>
               </div>
@@ -880,3 +1002,4 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
     </Dialog>
   );
 }
+

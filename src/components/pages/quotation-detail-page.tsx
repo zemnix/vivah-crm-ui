@@ -25,10 +25,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Label } from "@/components/ui/label";
-import { Popover, PopoverContent, PopoverAnchor } from "@/components/ui/popover";
 import type { QuotationCreateData, QuotationUpdateData, QuotationItem } from "@/api/quotationApi";
-import { useMachineStore } from "@/store/machineStore";
-import type { Machine } from "@/lib/schema";
 
 // Updated schema to match backend model
 const quotationItemSchema = z.object({
@@ -141,18 +138,6 @@ export default function QuotationDetailPage({
     name: "additionalCharges",
   });
 
-  // Product search/typeahead state
-  const { searchMachines, createMachine } = useMachineStore();
-  const [productQueryByIndex, setProductQueryByIndex] = useState<Record<number, string>>({});
-  const [productResultsByIndex, setProductResultsByIndex] = useState<Record<number, Machine[]>>({});
-  const [productLoadingByIndex, setProductLoadingByIndex] = useState<Record<number, boolean>>({});
-  const productSearchTimers = useRef<Record<number, any>>({});
-
-  // Confirmation dialog state
-  const [isCreateProductDialogOpen, setIsCreateProductDialogOpen] = useState(false);
-  const [newProductName, setNewProductName] = useState("");
-  const [newProductDescription, setNewProductDescription] = useState("");
-  const [currentProductIndex, setCurrentProductIndex] = useState<number | null>(null);
 
   // Fetch quotation data on mount
   useEffect(() => {
@@ -503,47 +488,6 @@ export default function QuotationDetailPage({
     }
   };
 
-  const handleCreateProduct = (index: number, name: string) => {
-    setNewProductName(name);
-    setNewProductDescription("");
-    setCurrentProductIndex(index);
-    setIsCreateProductDialogOpen(true);
-  };
-
-  const confirmCreateProduct = async () => {
-    if (currentProductIndex === null || !newProductName.trim()) return;
-
-    try {
-      const created = await createMachine({ 
-        name: newProductName.trim(), 
-        description: newProductDescription.trim() 
-      });
-      
-      if (created) {
-        form.setValue(`items.${currentProductIndex}.productName`, created.name);
-        form.setValue(`items.${currentProductIndex}.description`, created.description || "");
-        setProductResultsByIndex(prev => ({ ...prev, [currentProductIndex]: [] }));
-        setProductQueryByIndex(prev => ({ ...prev, [currentProductIndex]: '' }));
-        
-        toast({
-          title: "Success",
-          description: `Product "${created.name}" created successfully`,
-        });
-      }
-    } catch (error) {
-      console.error('Failed to create product:', error);
-      toast({
-        title: "Error",
-        description: "Failed to create product. Please try again.",
-        variant: "destructive",
-      });
-    } finally {
-      setIsCreateProductDialogOpen(false);
-      setNewProductName("");
-      setNewProductDescription("");
-      setCurrentProductIndex(null);
-    }
-  };
 
   // Handle new quotation creation
   if (id === 'new') {
@@ -726,80 +670,10 @@ export default function QuotationDetailPage({
                                   name={`items.${index}.productName`}
                                   render={({ field }: { field: any }) => (
                                     <FormControl>
-                                      <Popover open={(productQueryByIndex[index]?.length ?? 0) >= 3}>
-                                        <PopoverAnchor asChild>
-                                          <Input
-                                            {...field}
-                                            placeholder="Search product..."
-                                            onChange={(e) => {
-                                              field.onChange(e.target.value);
-                                              const q = e.target.value;
-                                              setProductQueryByIndex(prev => ({ ...prev, [index]: q }));
-                                              // debounce
-                                              if (productSearchTimers.current[index]) {
-                                                clearTimeout(productSearchTimers.current[index]);
-                                              }
-                                              productSearchTimers.current[index] = setTimeout(async () => {
-                                                if (!q || q.trim().length < 3) {
-                                                  setProductResultsByIndex(prev => ({ ...prev, [index]: [] }));
-                                                  setProductLoadingByIndex(prev => ({ ...prev, [index]: false }));
-                                                  return;
-                                                }
-                                                setProductLoadingByIndex(prev => ({ ...prev, [index]: true }));
-                                                const results = await searchMachines(q.trim());
-                                                setProductResultsByIndex(prev => ({ ...prev, [index]: results }));
-                                                setProductLoadingByIndex(prev => ({ ...prev, [index]: false }));
-                                              }, 300);
-                                            }}
-                                          />
-                                        </PopoverAnchor>
-                                        <PopoverContent 
-                                          className="w-[24rem] max-h-60 overflow-auto p-0" 
-                                          align="start"
-                                          onOpenAutoFocus={(e) => e.preventDefault()}
-                                        >
-                                          {productLoadingByIndex[index] && (
-                                            <div className="p-2 text-sm text-muted-foreground">Searching...</div>
-                                          )}
-                                          {!productLoadingByIndex[index] && (productResultsByIndex[index]?.length ?? 0) > 0 && (
-                                            productResultsByIndex[index]!.map((m) => (
-                                              <button
-                                                key={m._id}
-                                                type="button"
-                                                className="w-full text-left px-3 py-2 hover:bg-accent hover:text-accent-foreground cursor-pointer"
-                                                onClick={() => {
-                                                  form.setValue(`items.${index}.productName`, m.name);
-                                                  form.setValue(`items.${index}.description`, m.description || "");
-                                                  setProductResultsByIndex(prev => ({ ...prev, [index]: [] }));
-                                                  setProductQueryByIndex(prev => ({ ...prev, [index]: '' }));
-                                                }}
-                                              >
-                                                <div className="font-medium">{m.name}</div>
-                                                {m.description && (
-                                                  <div className="text-xs text-muted-foreground line-clamp-2">{m.description}</div>
-                                                )}
-                                              </button>
-                                            ))
-                                          )}
-
-                                          {!productLoadingByIndex[index] && (productResultsByIndex[index]?.length ?? 0) === 0 && productQueryByIndex[index]?.length >= 3 && (
-                                            <div className="p-2">
-                                              <div className="text-sm text-muted-foreground mb-2">No products found</div>
-                                              <Button
-                                                type="button"
-                                                size="sm"
-                                                className="cursor-pointer"
-                                                onClick={() => {
-                                                  const name = productQueryByIndex[index];
-                                                  handleCreateProduct(index, name);
-                                                }}
-                                              >
-                                                Create "{productQueryByIndex[index]}"
-                                              </Button>
-                                            </div>
-                                          )}
-                                        </PopoverContent>
-                                      </Popover>
+                                      <Input
+                                        {...field}
+                                        placeholder="Enter product name"
+                                      />
                                     </FormControl>
                                   )}
                                 />
@@ -1646,50 +1520,6 @@ export default function QuotationDetailPage({
           isLoading={isDeleting}
         />
 
-        {/* Create Product Confirmation Dialog */}
-        <Dialog open={isCreateProductDialogOpen} onOpenChange={setIsCreateProductDialogOpen}>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Product</DialogTitle>
-            </DialogHeader>
-            <div className="space-y-4">
-              <div>
-                <Label htmlFor="product-name">Product Name</Label>
-                <Input
-                  id="product-name"
-                  value={newProductName}
-                  onChange={(e) => setNewProductName(e.target.value)}
-                  placeholder="Enter product name"
-                />
-              </div>
-              <div>
-                <Label htmlFor="product-description">Description (Optional)</Label>
-                <Textarea
-                  id="product-description"
-                  value={newProductDescription}
-                  onChange={(e) => setNewProductDescription(e.target.value)}
-                  placeholder="Enter product description"
-                  rows={3}
-                  maxLength={500}
-                />
-              </div>
-            </div>
-            <DialogFooter>
-              <Button
-                variant="outline"
-                onClick={() => setIsCreateProductDialogOpen(false)}
-              >
-                Cancel
-              </Button>
-              <Button
-                onClick={confirmCreateProduct}
-                disabled={!newProductName.trim()}
-              >
-                Create Product
-              </Button>
-            </DialogFooter>
-          </DialogContent>
-        </Dialog>
       </div>
     </DashboardLayout>
   );

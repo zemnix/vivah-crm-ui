@@ -77,7 +77,7 @@ const FilterBar: React.FC<Readonly<FilterBarProps>> = ({
   return (
     <div className="bg-card border border-border rounded-lg shadow-sm mb-4">
       {/* Filter Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 pb-2 gap-2">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 pb-2 gap-2">
         <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
           <div className="flex items-center gap-2">
             <Filter className="h-4 w-4 text-muted-foreground" />
@@ -117,7 +117,7 @@ const FilterBar: React.FC<Readonly<FilterBarProps>> = ({
 
       {/* Filter Content - Collapsible */}
       {filtersExpanded && (
-        <div className="p-3 py-1">
+        <div className="p-3 sm:p-4 pt-2">
           <div className="flex flex-col lg:flex-row lg:items-start gap-4 lg:gap-8">
             {/* Status Filters */}
             <div className="flex-1 min-w-0">
@@ -746,7 +746,7 @@ export default function QuotationsPage({
 
   return (
     <DashboardLayout>
-      <div className="p-1 sm:p-2 lg:p-3" data-testid={testId}>
+      <div className="p-4 sm:p-6 lg:p-8" data-testid={testId}>
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">{pageTitle}</h1>
@@ -809,7 +809,7 @@ export default function QuotationsPage({
 
         {/* Quotations Table */}
         <Card>
-          <CardContent>
+          <CardContent className="p-4 sm:p-6">
             <DataTable
               data={quotations || []}
               columns={columns}

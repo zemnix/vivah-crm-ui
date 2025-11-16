@@ -8,12 +8,13 @@ import { StatusBadge } from "@/components/ui/status-badge";
 import { InteractionDialog } from "@/components/dialogs/interaction-dialog";
 import { useLeadStore } from "@/store/leadStore";
 import { useUserStore } from "@/store/admin/userStore";
-import type { Lead, LeadStatus } from "@/api/leadApi";
-import { updateLeadApi } from "@/api/leadApi";
+import type { User } from "@/api/userApi";
+import type { Lead, LeadStatus, LeadQueryParams } from "@/api/leadApi";
+import { updateLeadApi, getLeadName, getLeadMobile, getLeadEmail, getLeadLocation } from "@/api/leadApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
-import { Phone, Calendar as CalendarIcon, FileText, MoreHorizontal, Search, X, Filter, Plus, Trash2, User } from "lucide-react";
+import { Phone, Calendar as CalendarIcon, FileText, MoreHorizontal, Search, X, Filter, Plus, Trash2, User as UserIcon } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
@@ -44,6 +45,8 @@ import { Calendar } from "@/components/ui/calendar";
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadDialog } from "@/components/dialogs/lead-dialog";
+import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
+import { cn } from "@/lib/utils";
 
 // Helper function to format date to local YYYY-MM-DD without timezone issues
 const formatDateToLocal = (date: Date): string => {
@@ -55,12 +58,11 @@ const formatDateToLocal = (date: Date): string => {
 
 // Define allowed status transitions
 const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
-  'new': ['details_sent', 'followup', 'not_interested'],
-  'details_sent': ['followup', 'not_interested', 'quotation_sent'],
-  'followup': ['not_interested', 'quotation_sent'],
-  'quotation_sent': ['deal_done', 'followup', 'not_interested'],
+  'new': ['follow_up', 'not_interested'],
+  'follow_up': ['not_interested', 'quotation_sent', 'converted', 'lost'],
   'not_interested': [], // Terminal status
-  'deal_done': [], // Terminal status
+  'quotation_sent': ['follow_up', 'converted', 'lost'],
+  'converted': [], // Terminal status
   'lost': [], // Terminal status
 };
 
@@ -69,6 +71,7 @@ interface LeadsPageProps {
   readonly pageTitle: string;
   readonly pageDescription: string;
   readonly testId: string;
+  readonly initialStatus?: LeadStatus | LeadStatus[]; // Optional initial status filter
 }
 
 interface DraggableLeadCardProps {
@@ -117,13 +120,13 @@ const DraggableLeadCard = ({
     <Card
       ref={setNodeRef}
       style={style}
-      className={`
-        ${!isUpdating ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed'} 
-        hover:shadow-md transition-all duration-200 ease-in-out
-        bg-card border border-border hover:border-border
-        ${isDragging ? 'shadow-xl rotate-1 scale-102' : 'hover:scale-[1.01]'}
-        ${isUpdating ? 'ring-1 ring-blue-200 ring-opacity-50' : ''}
-      `}
+      className={cn(
+        !isUpdating ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed',
+        'hover:shadow-md transition-all duration-200 ease-in-out',
+        'bg-card border border-border hover:border-border',
+        isDragging ? 'shadow-xl rotate-1 scale-102' : 'hover:scale-[1.01]',
+        isUpdating ? 'ring-1 ring-blue-200 ring-opacity-50' : ''
+      )}
       onClick={() => !isUpdating && onView(lead)}
       {...(!isUpdating ? attributes : {})}
       {...(!isUpdating ? listeners : {})}
@@ -132,13 +135,13 @@ const DraggableLeadCard = ({
         <div className="space-y-2">
           <div>
             <div className="flex items-center justify-between">
-              <h5 className="font-medium text-foreground text-xs sm:text-sm leading-tight truncate pr-1">{lead.name}</h5>
+              <h5 className="font-medium text-foreground text-xs sm:text-sm leading-tight truncate pr-1">{getLeadName(lead)}</h5>
               {isUpdating && (
                 <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
               )}
             </div>
             <p className="text-xs text-muted-foreground truncate">
-              {lead.location || 'No location'}
+              {getLeadLocation(lead) || 'No location'}
             </p>
             {userRole === 'admin' && (
               <p className="text-xs text-muted-foreground truncate">
@@ -147,9 +150,9 @@ const DraggableLeadCard = ({
             )}
           </div>
 
-          {lead.mobile && (
+          {getLeadMobile(lead) && (
             <p className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded text-center">
-              {lead.mobile}
+              {getLeadMobile(lead)}
             </p>
           )}
 
@@ -344,7 +347,8 @@ export default function LeadsPage({
   userRole,
   pageTitle,
   pageDescription,
-  testId
+  testId,
+  initialStatus
 }: LeadsPageProps) {
   const [interactionDialogOpen, setInteractionDialogOpen] = useState(false);
   const [selectedLeadId, setSelectedLeadId] = useState<string>("");
@@ -362,11 +366,17 @@ export default function LeadsPage({
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
   const [leadToAssign, setLeadToAssign] = useState<Lead | null>(null);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
+  const [leadEditDialogOpen, setLeadEditDialogOpen] = useState(false);
+  const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
   const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>("All Staff");
   const selectedAssignedToRef = useRef<string>("All Staff");
 
-  // Filter states
-  const [selectedStatuses, setSelectedStatuses] = useState<LeadStatus[]>(['new']);
+  // Filter states - use initialStatus if provided, otherwise default to 'new'
+  const [selectedStatuses, setSelectedStatuses] = useState<LeadStatus[]>(
+    initialStatus 
+      ? (Array.isArray(initialStatus) ? initialStatus : [initialStatus])
+      : ['new']
+  );
   const [showFilters, setShowFilters] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>('');
   const [dateTo, setDateTo] = useState<string>('');
@@ -396,7 +406,7 @@ export default function LeadsPage({
   // Fetch leads on component mount and when filters change
   useEffect(() => {
     const fetchData = async () => {
-      const queryParams: any = {
+      const queryParams: LeadQueryParams = {
         page: currentPage,
         limit: pageSize,
         status: selectedStatuses,
@@ -443,7 +453,8 @@ export default function LeadsPage({
   }, [searchTerm]);
 
   const handleCall = (lead: Lead) => {
-    if (!lead.mobile) {
+    const mobile = getLeadMobile(lead);
+    if (!mobile) {
       toast({
         title: "No Phone Number",
         description: "This lead doesn't have a mobile number",
@@ -452,7 +463,7 @@ export default function LeadsPage({
       return;
     }
 
-    const phoneNumber = lead.mobile.replace(/[^\d]/g, '');
+    const phoneNumber = mobile.replace(/[^\d]/g, '');
     const dialerUrl = `tel:${phoneNumber}`;
     window.location.href = dialerUrl;
   };
@@ -469,8 +480,9 @@ export default function LeadsPage({
 
   const handleWhatsApp = (lead: Lead, e?: React.MouseEvent) => {
     e?.stopPropagation();
-    if (!lead.mobile) return;
-    const digits = lead.mobile.replace(/[^\d]/g, '');
+    const mobile = getLeadMobile(lead);
+    if (!mobile) return;
+    const digits = mobile.replace(/[^\d]/g, '');
     if (!digits) return;
     const url = `https://wa.me/${digits}`;
     window.open(url, '_blank', 'noopener');
@@ -522,6 +534,11 @@ export default function LeadsPage({
   const handleAssign = (lead: Lead) => {
     setLeadToAssign(lead);
     setAssignDialogOpen(true);
+  };
+
+  const handleEdit = (lead: Lead) => {
+    setLeadToEdit(lead);
+    setLeadEditDialogOpen(true);
   };
 
   const handleAssignedToChange = (value: string) => {
@@ -625,8 +642,8 @@ export default function LeadsPage({
       header: 'Lead',
       render: (_value: string, lead: Lead) => (
         <div>
-          <div className="text-sm font-medium text-foreground">{lead.name}</div>
-          <div className="text-sm text-muted-foreground">{lead.email || 'No email'}</div>
+          <div className="text-sm font-medium text-foreground">{getLeadName(lead)}</div>
+          <div className="text-sm text-muted-foreground">{getLeadEmail(lead) || 'No email'}</div>
         </div>
       ),
       sortable: true,
@@ -634,20 +651,20 @@ export default function LeadsPage({
     {
       key: 'location',
       header: 'Location',
-      render: (value: string) => value || 'No location',
+      render: (_value: string, lead: Lead) => getLeadLocation(lead) || 'No location',
       sortable: true,
     },
     {
       key: 'mobile',
       header: 'Contact',
-      render: (value: string) => value || 'No phone',
+      render: (_value: string, lead: Lead) => getLeadMobile(lead) || 'No phone',
     },
     ...(userRole === 'admin' ? [{
       key: 'assignedTo',
       header: 'Assigned To',
       render: (_value: string, lead: Lead) => (
         <div className="flex items-center gap-2">
-          <User className="h-4 w-4 text-muted-foreground" />
+          <UserIcon className="h-4 w-4 text-muted-foreground" />
           <span className="text-sm text-foreground">
             {lead.assignedTo?.name || 'Unassigned'}
           </span>
@@ -658,7 +675,7 @@ export default function LeadsPage({
       key: 'status',
       header: 'Status',
       render: (value: string) => (
-        <StatusBadge status={value as any} type="lead" />
+        <StatusBadge status={value as LeadStatus} type="lead" />
       ),
     },
     {
@@ -773,6 +790,11 @@ export default function LeadsPage({
           <DropdownMenuItem onClick={() => handleView(lead)}>
             View Details
           </DropdownMenuItem>
+          {(userRole === 'admin' || userRole === 'staff') && (
+            <DropdownMenuItem onClick={() => handleEdit(lead)}>
+              Edit Lead
+            </DropdownMenuItem>
+          )}
           {userRole === 'admin' && (
             <>
               {/* if lead is not assigned to any staff, then show the assign to staff option */}
@@ -799,11 +821,11 @@ export default function LeadsPage({
   // Kanban columns for lead statuses
   const kanbanColumns = [
     { id: 'new', title: 'New', status: 'new' as const },
-    { id: 'details_sent', title: 'Details Sent', status: 'details_sent' as const },
-    { id: 'followup', title: 'Follow Up', status: 'followup' as const },
+    { id: 'follow_up', title: 'Follow Up', status: 'follow_up' as const },
     { id: 'not_interested', title: 'Not Interested', status: 'not_interested' as const },
     { id: 'quotation_sent', title: 'Quotation Sent', status: 'quotation_sent' as const },
-    { id: 'deal_done', title: 'Deal Done', status: 'deal_done' as const },
+    { id: 'converted', title: 'Converted', status: 'converted' as const },
+    { id: 'lost', title: 'Lost', status: 'lost' as const },
   ];
 
   const KanbanBoard = ({
@@ -823,7 +845,7 @@ export default function LeadsPage({
     activeLead
   }: {
     leads: Lead[];
-    sensors: any;
+    sensors: ReturnType<typeof useSensors>;
     handleDragStart: (event: DragStartEvent) => void;
     handleDragEnd: (event: DragEndEvent) => void;
     handleCall: (lead: Lead) => void;
@@ -874,13 +896,13 @@ export default function LeadsPage({
               <Card className="opacity-95 shadow-2xl border-2 border-blue-300 bg-white transform rotate-3 scale-105">
                 <CardContent className="p-4">
                   <div className="space-y-2">
-                    <h5 className="font-semibold text-foreground text-sm">{activeLead.name}</h5>
+                    <h5 className="font-semibold text-foreground text-sm">{getLeadName(activeLead)}</h5>
                     <p className="text-xs text-muted-foreground">
-                      {activeLead.location || 'No location'}
+                      {getLeadLocation(activeLead) || 'No location'}
                     </p>
-                    {activeLead.mobile && (
+                    {getLeadMobile(activeLead) && (
                       <p className="text-xs text-muted-foreground font-mono bg-gray-50 px-2 py-1 rounded">
-                        {activeLead.mobile}
+                        {getLeadMobile(activeLead)}
                       </p>
                     )}
                   </div>
@@ -897,11 +919,10 @@ export default function LeadsPage({
   // All available status options
   const allStatuses: { value: LeadStatus; label: string }[] = [
     { value: 'new', label: 'New' },
-    { value: 'details_sent', label: 'Details Sent' },
-    { value: 'followup', label: 'Follow Up' },
+    { value: 'follow_up', label: 'Follow Up' },
     { value: 'not_interested', label: 'Not Interested' },
     { value: 'quotation_sent', label: 'Quotation Sent' },
-    { value: 'deal_done', label: 'Deal Done' },
+    { value: 'converted', label: 'Converted' },
     { value: 'lost', label: 'Lost' },
   ];
 
@@ -919,7 +940,7 @@ export default function LeadsPage({
         ? prev.filter(s => s !== status)
         : [...prev, status];
 
-      const queryParams: any = {
+      const queryParams: LeadQueryParams = {
         page: 1,
         limit: pageSize,
         status: newStatuses,
@@ -947,11 +968,10 @@ export default function LeadsPage({
     setDebouncedSearchTerm("");
     setSelectedAssignedTo("All Staff");
     selectedAssignedToRef.current = "All Staff";
-    const queryParams: any = {
+    const queryParams: LeadQueryParams = {
       page: 1,
       limit: pageSize,
       status: defaultStatuses,
-      search: undefined,
       dateFrom: dateFrom || undefined,
       dateTo: dateTo || undefined,
     };
@@ -970,7 +990,7 @@ export default function LeadsPage({
     setDateFrom(from);
     setDateTo(to);
 
-    const queryParams: any = {
+    const queryParams: LeadQueryParams = {
       page: 1,
       limit: pageSize,
       status: selectedStatuses,
@@ -992,13 +1012,11 @@ export default function LeadsPage({
   const clearDateFilter = () => {
     setDateFrom('');
     setDateTo('');
-    const queryParams: any = {
+    const queryParams: LeadQueryParams = {
       page: 1,
       limit: pageSize,
       status: selectedStatuses,
       search: debouncedSearchTerm || undefined,
-      dateFrom: undefined,
-      dateTo: undefined,
     };
 
     // Handle assignedTo filter for admin users - use ref to get current value
@@ -1036,7 +1054,7 @@ export default function LeadsPage({
     clearDateFilter: () => void;
     handleDateRangeChange: (from: string, to: string) => void;
     userRole: 'admin' | 'staff';
-    staffMembers: any[];
+    staffMembers: User[];
     selectedAssignedTo: string;
     handleAssignedToChange: (value: string) => void;
   }) => (
@@ -1227,7 +1245,7 @@ export default function LeadsPage({
 
   return (
     <DashboardLayout>
-      <div className="p-1 sm:p-2 lg:p-3" data-testid={testId}>
+      <div className="p-4 sm:p-6 lg:p-8" data-testid={testId}>
         {/* Header Section - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
           <div className="flex-1 min-w-0">
@@ -1374,7 +1392,7 @@ export default function LeadsPage({
           onConfirm={handleConfirmDelete}
           title="Delete Lead"
           description="Are you sure you want to delete this lead? This action cannot be undone."
-          itemName={leadToDelete?.name || ""}
+          itemName={leadToDelete ? getLeadName(leadToDelete) : ""}
           itemType="lead"
           isLoading={isDeleting}
         />
@@ -1388,7 +1406,7 @@ export default function LeadsPage({
             staffMembers={staffMembers || []}
             onSuccess={() => {
               // Refresh data after successful assignment
-              const queryParams: any = {
+              const queryParams: LeadQueryParams = {
                 page: currentPage,
                 limit: pageSize,
                 status: selectedStatuses,
@@ -1413,6 +1431,39 @@ export default function LeadsPage({
             open={leadDialogOpen}
             onOpenChange={setLeadDialogOpen}
             mode="create"
+          />
+        )}
+
+        {/* Edit Lead Dialog - For admin and staff */}
+        {(userRole === 'admin' || userRole === 'staff') && (
+          <LeadEditDialog
+            open={leadEditDialogOpen}
+            onOpenChange={(open) => {
+              setLeadEditDialogOpen(open);
+              if (!open) {
+                // Refresh leads list after closing dialog (in case it was updated)
+                if (leadToEdit) {
+                  const queryParams: LeadQueryParams = {
+                    page: currentPage,
+                    limit: pageSize,
+                    status: selectedStatuses,
+                    search: debouncedSearchTerm || undefined,
+                    dateFrom: dateFrom || undefined,
+                    dateTo: dateTo || undefined,
+                  };
+
+                  // Handle assignedTo filter for admin users - use ref to get current value
+                  const currentAssignedTo = selectedAssignedToRef.current;
+                  if (userRole === 'admin' && currentAssignedTo && currentAssignedTo !== "All Staff") {
+                    queryParams.assignedTo = currentAssignedTo;
+                  }
+
+                  fetchLeads(queryParams);
+                }
+                setLeadToEdit(null);
+              }
+            }}
+            lead={leadToEdit}
           />
         )}
       </div>

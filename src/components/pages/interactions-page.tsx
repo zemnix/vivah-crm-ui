@@ -73,7 +73,7 @@ const FilterBar = ({
   }) => (
   <div className="bg-card border border-border rounded-lg shadow-sm mb-4">
     {/* Filter Header */}
-    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-2 sm:p-3 pb-2 gap-2">
+    <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 pb-2 gap-2">
       <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
         <div className="flex items-center gap-2">
           <Filter className="h-4 w-4 text-muted-foreground" />
@@ -116,7 +116,7 @@ const FilterBar = ({
 
     {/* Filter Content - Collapsible */}
     {filtersExpanded && (
-      <div className="p-2 sm:p-3 py-1">
+      <div className="p-3 sm:p-4 pt-2">
         <div className="flex flex-col lg:flex-row items-start gap-4 lg:gap-8">
           {/* Type Filters */}
           <div className="flex-1 w-full">
@@ -665,7 +665,7 @@ export default function InteractionsPage({
 
   return (
     <DashboardLayout>
-      <div className="p-1 sm:p-2 lg:p-3" data-testid={testId}>
+      <div className="p-4 sm:p-6 lg:p-8" data-testid={testId}>
         {/* Header Section - Mobile Responsive */}
         <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-4 sm:mb-6 gap-4">
           <div className="flex-1 min-w-0">
@@ -727,7 +727,7 @@ export default function InteractionsPage({
 
         {/* Interactions Table */}
         <Card>
-          <CardContent className="p-1 sm:p-2 lg:p-3">
+          <CardContent className="p-4 sm:p-6">
             <DataTable
               data={interactions || []}
               columns={columns}

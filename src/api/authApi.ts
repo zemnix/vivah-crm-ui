@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 
-export type UserRole = 'admin' | 'staff' | 'worker';
+export type UserRole = 'admin' | 'staff';
 
 export interface AuthUser {
   id: string;
@@ -37,7 +37,13 @@ export const loginApi = async (credentials: LoginCredentials) => {
     const response = await apiClient.post('/users/login', credentials);
     return response.data.data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || 'Login failed');
+    // Try multiple paths to extract error message from different response structures
+    const errorMessage = 
+      error.response?.data?.message || 
+      error.response?.data?.error?.message ||
+      error.message || 
+      'Invalid email or password';
+    throw new Error(errorMessage);
   }
 };
 
@@ -46,7 +52,13 @@ export const signupApi = async (signupData: SignupData) => {
     const response = await apiClient.post('/users/signup', signupData);
     return response.data.data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || 'Signup failed');
+    // Try multiple paths to extract error message from different response structures
+    const errorMessage = 
+      error.response?.data?.message || 
+      error.response?.data?.error?.message ||
+      error.message || 
+      'Signup failed';
+    throw new Error(errorMessage);
   }
 };
 
@@ -64,7 +76,13 @@ export const forgotPasswordApi = async (data: ForgotPasswordData) => {
     const response = await apiClient.post('/users/forgot-password', data);
     return response.data.data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || 'Failed to send password reset email');
+    // Try multiple paths to extract error message from different response structures
+    const errorMessage = 
+      error.response?.data?.message || 
+      error.response?.data?.error?.message ||
+      error.message || 
+      'Failed to send password reset email';
+    throw new Error(errorMessage);
   }
 };
 
@@ -73,6 +91,12 @@ export const resetPasswordApi = async (data: ResetPasswordData) => {
     const response = await apiClient.post('/users/reset-password', data);
     return response.data.data;
   } catch (error: any) {
-    throw new Error(error.response?.data?.message || 'Failed to reset password');
+    // Try multiple paths to extract error message from different response structures
+    const errorMessage = 
+      error.response?.data?.message || 
+      error.response?.data?.error?.message ||
+      error.message || 
+      'Failed to reset password';
+    throw new Error(errorMessage);
   }
 };
