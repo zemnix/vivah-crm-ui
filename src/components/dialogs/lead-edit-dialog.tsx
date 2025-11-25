@@ -14,6 +14,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { useEventConfigStore } from "@/store/eventConfigStore";
+import { useSfxConfigStore } from "@/store/sfxConfigStore";
 import type { Lead, LeadUpdateData, LeadStatus } from "@/api/leadApi";
 import type { BaraatFieldConfig } from "@/api/baraatConfigApi";
 import { useEffect, useState, useMemo } from "react";
@@ -110,6 +111,12 @@ const createLeadEditSchema = (
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
       })
     ).optional(),
+    sfx: z.array(
+      z.object({
+        name: z.string().min(1, "SFX name is required"),
+        quantity: z.number().min(1, "Quantity must be at least 1"),
+      })
+    ).optional(),
     baraatDetails: createBaraatDetailsSchema(allFields, legacyFields),
   });
 };
@@ -128,6 +135,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
   const { users, fetchAllUsers, loading: usersLoading } = useUserStore();
   const { fields: allFields, fetchAllFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
   const { events, fetchAllEvents, loading: eventsLoading } = useEventConfigStore();
+  const { sfxConfigs, fetchAllSfxConfigs, loading: sfxLoading } = useSfxConfigStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Detect legacy fields (fields in lead.baraatDetails that are not in config)
@@ -159,6 +167,58 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
   const sortedLeadFields = useMemo(() => {
     return [...leadFields].sort((a, b) => a.order - b.order);
   }, [leadFields]);
+
+  // Combine events from config with event names from lead that aren't in config
+  const availableEvents = useMemo(() => {
+    const eventNamesFromConfig = new Set(events.map(e => e.name));
+    const eventNamesFromLead = lead?.typesOfEvent?.map(e => e.name) || [];
+    
+    // Find event names in lead that aren't in config
+    const missingEventNames = eventNamesFromLead.filter(name => 
+      name && !eventNamesFromConfig.has(name)
+    );
+    
+    // Create a combined list: config events + missing event names
+    const combinedEvents = [
+      ...events,
+      ...missingEventNames.map(name => ({
+        _id: `legacy-${name}`, // Temporary ID for legacy events
+        name: name,
+        description: '', // Not needed for display
+        isActive: false,
+        createdAt: '',
+        updatedAt: ''
+      }))
+    ];
+    
+    return combinedEvents;
+  }, [events, lead?.typesOfEvent]);
+
+  // Combine SFX configs with SFX names from lead that aren't in config
+  const availableSfxConfigs = useMemo(() => {
+    const sfxNamesFromConfig = new Set(sfxConfigs.map(s => s.name));
+    const sfxNamesFromLead = lead?.sfx?.map(s => s.name) || [];
+    
+    // Find SFX names in lead that aren't in config
+    const missingSfxNames = sfxNamesFromLead.filter(name => 
+      name && !sfxNamesFromConfig.has(name)
+    );
+    
+    // Create a combined list: config SFX + missing SFX names
+    const combinedSfx = [
+      ...sfxConfigs,
+      ...missingSfxNames.map(name => ({
+        _id: `legacy-${name}`, // Temporary ID for legacy SFX
+        name: name,
+        quantity: 1, // Default quantity
+        isActive: false,
+        createdAt: '',
+        updatedAt: ''
+      }))
+    ];
+    
+    return combinedSfx;
+  }, [sfxConfigs, lead?.sfx]);
 
   // Filter users to get only staff for assignment
   const staffMembers = useMemo(() => 
@@ -222,6 +282,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         status: lead.status || 'new',
         assignedTo: lead.assignedTo?._id || undefined,
         typesOfEvent: typesOfEvent.length > 0 ? typesOfEvent : undefined,
+        sfx: lead.sfx?.length > 0 ? lead.sfx.map(s => ({ name: s.name, quantity: s.quantity })) : undefined,
         baraatDetails: lead.baraatDetails || {},
       };
     }
@@ -263,9 +324,10 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     if (open) {
       fetchAllUsers({ role: undefined, page: 1, limit: 100 });
       fetchAllFields(); // Fetch all fields (active + inactive) for editing
-      fetchAllEvents();
+      fetchAllEvents(); // Include inactive events so existing leads can display their events
+      fetchAllSfxConfigs(); // Include inactive SFX configs so existing leads can display their SFX
     }
-  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents]);
+  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents, fetchAllSfxConfigs]);
 
   const onSubmit = async (data: LeadEditForm) => {
     if (!user || !lead) return;
@@ -298,6 +360,12 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         date: new Date(event.date + 'T00:00:00').toISOString(),
         dayNight: event.dayNight,
         numberOfGuests: event.numberOfGuests,
+      }));
+
+      // Prepare SFX data
+      const sfxData = data.sfx?.filter(sfx => sfx.name && sfx.quantity > 0).map(sfx => ({
+        name: sfx.name,
+        quantity: sfx.quantity,
       }));
 
       // Prepare baraat details - include all fields (config + legacy)
@@ -345,6 +413,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
       const updateData: LeadUpdateData = {
         customer: customerData,
         typesOfEvent: typesOfEventData,
+        sfx: sfxData && sfxData.length > 0 ? sfxData : undefined,
         baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
         status: data.status,
         ...(user.role === 'staff' 
@@ -776,7 +845,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {events.map((eventConfig) => (
+                                {availableEvents.map((eventConfig) => (
                                   <SelectItem key={eventConfig._id} value={eventConfig.name}>
                                     {eventConfig.name}
                                   </SelectItem>
@@ -877,6 +946,117 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                 {(!form.watch("typesOfEvent") || form.watch("typesOfEvent")?.length === 0) && (
                   <div className="text-center py-4 text-sm text-muted-foreground border border-dashed rounded-lg">
                     No events added. Click "Add Event" to add an event.
+                  </div>
+                )}
+              </div>
+
+              {/* SFX Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentSfx = form.getValues("sfx") || [];
+                      form.setValue("sfx", [
+                        ...currentSfx,
+                        {
+                          name: "",
+                          quantity: 1,
+                        },
+                      ]);
+                    }}
+                    disabled={isSubmitting || loading || sfxLoading}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add SFX
+                  </Button>
+                </div>
+
+                {form.watch("sfx")?.map((sfx, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <h4 className="font-medium text-sm">SFX {index + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentSfx = form.getValues("sfx") || [];
+                          form.setValue(
+                            "sfx",
+                            currentSfx.filter((_, i) => i !== index)
+                          );
+                        }}
+                        disabled={isSubmitting || loading}
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* SFX Name - Dropdown from SFX Config */}
+                      <FormField
+                        control={form.control}
+                        name={`sfx.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>SFX Name *</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={isSubmitting || loading || sfxLoading}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select SFX" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {availableSfxConfigs.map((sfxConfig) => (
+                                  <SelectItem key={sfxConfig._id} value={sfxConfig.name}>
+                                    {sfxConfig.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Quantity */}
+                      <FormField
+                        control={form.control}
+                        name={`sfx.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="number"
+                                placeholder="Enter quantity"
+                                min="1"
+                                {...field}
+                                onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
+                                value={field.value || ""}
+                                disabled={isSubmitting || loading}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </Card>
+                ))}
+
+                {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
+                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                    No SFX added. Click "Add SFX" to add special effects.
                   </div>
                 )}
               </div>

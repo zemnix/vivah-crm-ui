@@ -19,11 +19,18 @@ export interface TypeOfEvent {
   numberOfGuests: number;
 }
 
+// SFX based on backend model
+export interface Sfx {
+  name: string;
+  quantity: number;
+}
+
 // Lead types based on backend model
 export interface Lead {
   _id: string;
   customer: Customer;
   typesOfEvent?: TypeOfEvent[];
+  sfx?: Sfx[];
   baraatDetails?: Record<string, string | number | null>; // Map of field keys to values
   status: LeadStatus;
   createdBy: {
@@ -53,6 +60,7 @@ export type LeadStatus =
 export interface LeadCreateData {
   customer: Customer;
   typesOfEvent?: TypeOfEvent[];
+  sfx?: Sfx[];
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   assignedTo?: string;
@@ -61,6 +69,7 @@ export interface LeadCreateData {
 export interface LeadUpdateData {
   customer?: Partial<Customer>;
   typesOfEvent?: TypeOfEvent[];
+  sfx?: Sfx[];
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   assignedTo?: string;

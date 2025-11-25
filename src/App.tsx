@@ -21,6 +21,7 @@ import AdminSettings from "@/pages/admin/settings";
 import AdminBaraatConfig from "@/pages/admin/baraat-config";
 import AdminEnquiries from "@/pages/admin/enquiries";
 import AdminEventConfig from "@/pages/admin/event-config";
+import AdminSfxConfig from "@/pages/admin/sfx-config";
 import AdminMasterConfig from "@/pages/admin/master-config";
 import AdminConvertedLeads from "@/pages/admin/converted-leads";
 import StaffDashboard from "@/pages/staff/dashboard";
@@ -84,6 +85,7 @@ function App() {
           <Route path="/admin/master-config" element={<AdminMasterConfig />} />
           <Route path="/admin/baraat-config" element={<AdminBaraatConfig />} />
           <Route path="/admin/event-config" element={<AdminEventConfig />} />
+          <Route path="/admin/sfx-config" element={<AdminSfxConfig />} />
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/converted-leads" element={<AdminConvertedLeads />} />
 

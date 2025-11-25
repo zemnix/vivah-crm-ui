@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { FileText, Calendar } from "lucide-react";
+import { FileText, Calendar, Sparkles } from "lucide-react";
 
 export default function AdminMasterConfig() {
   const navigate = useNavigate();
@@ -17,7 +17,7 @@ export default function AdminMasterConfig() {
           </p>
         </div>
 
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {/* Baraat Config Card */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/baraat-config')}>
             <CardHeader>
@@ -66,6 +66,32 @@ export default function AdminMasterConfig() {
               </p>
               <Button className="w-full" variant="outline">
                 Manage Event Config
+              </Button>
+            </CardContent>
+          </Card>
+
+          {/* SFX Config Card */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/sfx-config')}>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Sparkles className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>SFX Configuration</CardTitle>
+                  <CardDescription className="mt-1">
+                    Manage special effects configurations
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Configure special effects (SFX) with name and quantity. 
+                Add, edit, or remove SFX configurations for your events.
+              </p>
+              <Button className="w-full" variant="outline">
+                Manage SFX Config
               </Button>
             </CardContent>
           </Card>

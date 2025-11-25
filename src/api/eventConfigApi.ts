@@ -5,6 +5,7 @@ export interface EventConfig {
   _id: string;
   name: string;
   description: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -27,6 +28,11 @@ export const createEventConfigApi = async (
   return response.data.data;
 };
 
+export const getActiveEventConfigsApi = async (): Promise<EventConfig[]> => {
+  const response = await apiClient.get('/event-config/active');
+  return response.data.data;
+};
+
 export const getAllEventConfigsApi = async (): Promise<EventConfig[]> => {
   const response = await apiClient.get('/event-config');
   return response.data.data;
@@ -45,7 +51,9 @@ export const updateEventConfigApi = async (
   return response.data.data;
 };
 
-export const deleteEventConfigApi = async (eventId: string): Promise<void> => {
-  await apiClient.delete(`/event-config/${eventId}`);
+export const deleteEventConfigApi = async (eventId: string, hardDelete = false): Promise<void> => {
+  await apiClient.delete(`/event-config/${eventId}`, {
+    params: { hardDelete: hardDelete ? 'true' : 'false' }
+  });
 };
 

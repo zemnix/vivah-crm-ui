@@ -5,6 +5,7 @@ import {
   EventConfigCreateData,
   EventConfigUpdateData,
   createEventConfigApi,
+  getActiveEventConfigsApi,
   getAllEventConfigsApi,
   updateEventConfigApi,
   deleteEventConfigApi,
@@ -25,13 +26,14 @@ interface EventConfigStore {
   clearError: () => void;
 
   // API Actions
+  fetchActiveEvents: () => Promise<void>;
   fetchAllEvents: () => Promise<void>;
   createEvent: (eventData: EventConfigCreateData) => Promise<EventConfig | null>;
   updateEvent: (
     eventId: string,
     updateData: EventConfigUpdateData
   ) => Promise<EventConfig | null>;
-  deleteEvent: (eventId: string) => Promise<boolean>;
+  deleteEvent: (eventId: string, hardDelete?: boolean) => Promise<boolean>;
   
   // Utility Actions
   getEventById: (eventId: string) => EventConfig | undefined;
@@ -59,6 +61,22 @@ export const useEventConfigStore = create<EventConfigStore>()(
       clearError: () => set({ error: null }),
 
       // API Actions
+      fetchActiveEvents: async () => {
+        set({ loading: true, error: null });
+        try {
+          const events = await getActiveEventConfigsApi();
+          set({
+            events: events,
+            loading: false,
+          });
+        } catch (error) {
+          set({
+            error: error instanceof Error ? error.message : 'Failed to fetch active events',
+            loading: false,
+          });
+        }
+      },
+
       fetchAllEvents: async () => {
         set({ loading: true, error: null });
         try {
@@ -129,20 +147,32 @@ export const useEventConfigStore = create<EventConfigStore>()(
         }
       },
 
-      deleteEvent: async (eventId) => {
+      deleteEvent: async (eventId, hardDelete = false) => {
         set({ loading: true, error: null });
         try {
-          await deleteEventConfigApi(eventId);
+          await deleteEventConfigApi(eventId, hardDelete);
 
-          // Remove from events list
-          const currentEvents = get().events;
-          const filteredEvents = currentEvents.filter((event) => event._id !== eventId);
-
-          set({
-            events: filteredEvents,
-            selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
-            loading: false,
-          });
+          if (hardDelete) {
+            // Remove from events list
+            const currentEvents = get().events;
+            const filteredEvents = currentEvents.filter((event) => event._id !== eventId);
+            set({
+              events: filteredEvents,
+              selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
+              loading: false,
+            });
+          } else {
+            // Mark as inactive in events list
+            const currentEvents = get().events;
+            const updatedEvents = currentEvents.map((event) =>
+              event._id === eventId ? { ...event, isActive: false } : event
+            );
+            set({
+              events: updatedEvents,
+              selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
+              loading: false,
+            });
+          }
 
           return true;
         } catch (error) {

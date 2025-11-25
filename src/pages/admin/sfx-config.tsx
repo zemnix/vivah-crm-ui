@@ -6,34 +6,34 @@ import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Plus, Edit, Trash2, MoreHorizontal, Filter } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useEventConfigStore } from "@/store/eventConfigStore";
-import { EventConfigDialog } from "@/components/dialogs/event-config-dialog";
+import { useSfxConfigStore } from "@/store/sfxConfigStore";
+import { SfxConfigDialog } from "@/components/dialogs/sfx-config-dialog";
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { useEffect, useState, useMemo } from "react";
 import { useToast } from "@/hooks/use-toast";
-import type { EventConfig } from "@/api/eventConfigApi";
+import type { SfxConfig } from "@/api/sfxConfigApi";
 
-export default function AdminEventConfig() {
+export default function AdminSfxConfig() {
   const {
-    events,
+    sfxConfigs,
     loading,
     error,
-    fetchAllEvents,
-    deleteEvent,
+    fetchAllSfxConfigs,
+    deleteSfx,
     clearError,
-  } = useEventConfigStore();
+  } = useSfxConfigStore();
   const { toast } = useToast();
 
   const [dialogOpen, setDialogOpen] = useState(false);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [selectedEvent, setSelectedEvent] = useState<EventConfig | null>(null);
+  const [selectedSfx, setSelectedSfx] = useState<SfxConfig | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
   const [selectedStatuses, setSelectedStatuses] = useState<('active' | 'inactive')[]>(['active', 'inactive']);
   const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => {
-    fetchAllEvents();
-  }, [fetchAllEvents]);
+    fetchAllSfxConfigs();
+  }, [fetchAllSfxConfigs]);
 
   useEffect(() => {
     if (error) {
@@ -47,73 +47,74 @@ export default function AdminEventConfig() {
   }, [error, toast, clearError]);
 
   const handleCreate = () => {
-    setSelectedEvent(null);
+    setSelectedSfx(null);
     setDialogMode('create');
     setDialogOpen(true);
   };
 
-  const handleEdit = (event: EventConfig) => {
-    setSelectedEvent(event);
+  const handleEdit = (sfx: SfxConfig) => {
+    setSelectedSfx(sfx);
     setDialogMode('edit');
     setDialogOpen(true);
   };
 
-  const handleDelete = (event: EventConfig) => {
-    setSelectedEvent(event);
+  const handleDelete = (sfx: SfxConfig) => {
+    setSelectedSfx(sfx);
     setDeleteDialogOpen(true);
   };
 
   const confirmDelete = async () => {
-    if (!selectedEvent) return;
+    if (!selectedSfx) return;
 
-    const success = await deleteEvent(selectedEvent._id, false);
+    const success = await deleteSfx(selectedSfx._id, false);
     if (success) {
       toast({
         title: "Success",
-        description: "Event deactivated successfully",
+        description: "SFX config deactivated successfully",
       });
       setDeleteDialogOpen(false);
-      setSelectedEvent(null);
+      setSelectedSfx(null);
     } else {
       toast({
         title: "Error",
-        description: "Failed to deactivate event",
+        description: "Failed to deactivate SFX config",
         variant: "destructive",
       });
     }
   };
 
-  // Filter events based on selected statuses
-  const filteredEvents = useMemo(() => {
+  // Filter SFX configs based on selected statuses
+  const filteredSfxConfigs = useMemo(() => {
     if (selectedStatuses.length === 2) {
-      return events; // Show all if both are selected
+      return sfxConfigs; // Show all if both are selected
     }
-    return events.filter((event) => {
+    return sfxConfigs.filter((sfx) => {
       if (selectedStatuses.includes('active')) {
-        return event.isActive;
+        return sfx.isActive;
       }
       if (selectedStatuses.includes('inactive')) {
-        return !event.isActive;
+        return !sfx.isActive;
       }
       return false;
     });
-  }, [events, selectedStatuses]);
+  }, [sfxConfigs, selectedStatuses]);
 
   const columns = [
     {
       key: 'name',
-      header: 'Event Name',
+      header: 'SFX Name',
       render: (value: string) => (
         <div className="font-medium text-foreground">{value}</div>
       ),
       sortable: true,
     },
     {
-      key: 'description',
-      header: 'Description',
-      render: (value: string) => (
-        <div className="text-sm text-muted-foreground line-clamp-2">{value}</div>
+      key: 'quantity',
+      header: 'Quantity',
+      render: (value: number) => (
+        <div className="text-sm text-muted-foreground">{value}</div>
       ),
+      sortable: true,
     },
     {
       key: 'isActive',
@@ -139,7 +140,7 @@ export default function AdminEventConfig() {
     },
   ];
 
-  const actions = (event: EventConfig) => (
+  const actions = (sfx: SfxConfig) => (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <Button variant="ghost" size="sm" className="h-8 w-8 p-0">
@@ -147,12 +148,12 @@ export default function AdminEventConfig() {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end">
-        <DropdownMenuItem onClick={() => handleEdit(event)}>
+        <DropdownMenuItem onClick={() => handleEdit(sfx)}>
           <Edit className="mr-2 h-4 w-4" />
           Edit
         </DropdownMenuItem>
         <DropdownMenuItem
-          onClick={() => handleDelete(event)}
+          onClick={() => handleDelete(sfx)}
           className="text-destructive"
         >
           <Trash2 className="mr-2 h-4 w-4" />
@@ -167,14 +168,14 @@ export default function AdminEventConfig() {
       <div className="p-4 sm:p-6 lg:p-8">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between mb-6 gap-4">
           <div>
-            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">Event Configuration</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold text-foreground">SFX Configuration</h1>
             <p className="text-muted-foreground mt-2">
-              Manage event types that can be used when creating leads
+              Manage special effects (SFX) configurations with name and quantity
             </p>
           </div>
           <Button onClick={handleCreate} className="w-full sm:w-auto">
             <Plus className="mr-2 h-4 w-4" />
-            Add Event
+            Add SFX
           </Button>
         </div>
 
@@ -257,28 +258,28 @@ export default function AdminEventConfig() {
 
         <Card>
           <CardHeader>
-            <CardTitle>Events</CardTitle>
+            <CardTitle>SFX Configs</CardTitle>
           </CardHeader>
           <CardContent>
             <DataTable
-              data={filteredEvents}
+              data={filteredSfxConfigs}
               columns={columns}
               actions={actions}
               isLoading={loading}
-              emptyMessage="No events found. Create your first event to get started."
+              emptyMessage="No SFX configs found. Create your first SFX config to get started."
             />
           </CardContent>
         </Card>
 
-        <EventConfigDialog
+        <SfxConfigDialog
           open={dialogOpen}
           onOpenChange={(open) => {
             setDialogOpen(open);
             if (!open) {
-              setSelectedEvent(null);
+              setSelectedSfx(null);
             }
           }}
-          event={selectedEvent}
+          sfx={selectedSfx}
           mode={dialogMode}
         />
 
@@ -286,10 +287,10 @@ export default function AdminEventConfig() {
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           onConfirm={confirmDelete}
-          title="Deactivate Event"
-          description="Are you sure you want to deactivate this event? It will no longer appear in dropdowns for new leads, but existing leads will still have access to it."
-          itemName={selectedEvent?.name || ""}
-          itemType="event"
+          title="Deactivate SFX Config"
+          description="Are you sure you want to deactivate this SFX config? It will no longer appear in dropdowns, but existing data will still have access to it."
+          itemName={selectedSfx?.name || ""}
+          itemType="SFX config"
           isLoading={loading}
         />
       </div>

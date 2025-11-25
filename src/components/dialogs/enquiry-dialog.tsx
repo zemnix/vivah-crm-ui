@@ -48,7 +48,7 @@ interface EnquiryDialogProps {
 
 export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDialogProps) {
   const { createEnquiry, updateEnquiry, loading } = useEnquiryStore();
-  const { events, fetchAllEvents, loading: eventsLoading } = useEventConfigStore();
+  const { events, fetchActiveEvents, loading: eventsLoading } = useEventConfigStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Initialize form with default values
@@ -115,9 +115,9 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
   // Fetch event configs when dialog opens
   useEffect(() => {
     if (open) {
-      fetchAllEvents();
+      fetchActiveEvents(); // Only fetch active events for creating new enquiries
     }
-  }, [open, fetchAllEvents]);
+  }, [open, fetchActiveEvents]);
 
   const onSubmit = async (data: EnquiryForm) => {
     setIsSubmitting(true);

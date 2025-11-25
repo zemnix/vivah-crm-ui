@@ -538,6 +538,32 @@ export default function LeadDetailPage({
               </Card>
             )}
 
+            {/* SFX Information */}
+            {lead.sfx && lead.sfx.length > 0 && (
+              <Card>
+                <CardHeader>
+                  <CardTitle>SFX Details</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {lead.sfx.map((sfxItem, index) => (
+                      <div
+                        key={index}
+                        className="p-4 border rounded-lg bg-muted/30 space-y-2"
+                      >
+                        <div className="flex items-center justify-between">
+                          <h4 className="font-semibold text-foreground">{sfxItem.name}</h4>
+                          <Badge variant="secondary" className="text-xs">
+                            Quantity: {sfxItem.quantity}
+                          </Badge>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            )}
+
             {/* Baraat Details (Custom Fields) */}
             {baraatDetailsItems.length > 0 && (
               <Card>

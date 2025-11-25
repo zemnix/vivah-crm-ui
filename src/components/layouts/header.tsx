@@ -28,7 +28,7 @@ export function Header({ onMenuClick, user }: HeaderProps) {
   const userInitials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
-    <header className="flex items-center justify-between h-14 w-full px-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
+    <header className="flex items-center justify-between h-12 w-full px-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
       <div className="flex items-center flex-1 min-w-0">
         {/* Mobile Menu Button */}
         <Button
