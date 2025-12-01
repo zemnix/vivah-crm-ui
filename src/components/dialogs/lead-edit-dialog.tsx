@@ -103,10 +103,28 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     return combinedEvents;
   }, [events, lead?.typesOfEvent]);
 
+  // Helper to convert sfx from Map/object format to array format
+  const convertSfxToArray = (sfx: any): Array<{ name: string; quantity: string }> => {
+    if (!sfx) return [];
+    // If it's already an array, return it
+    if (Array.isArray(sfx)) {
+      return sfx.map(s => ({ name: s.name, quantity: String(s.quantity ?? '') }));
+    }
+    // If it's an object/Map, convert it to array
+    if (typeof sfx === 'object') {
+      return Object.entries(sfx).map(([name, quantity]) => ({
+        name,
+        quantity: String(quantity ?? '')
+      }));
+    }
+    return [];
+  };
+
   // Combine SFX configs with SFX names from lead that aren't in config
   const availableSfxConfigs = useMemo(() => {
     const sfxNamesFromConfig = new Set(sfxConfigs.map(s => s.name));
-    const sfxNamesFromLead = lead?.sfx?.map(s => s.name) || [];
+    const sfxArray = convertSfxToArray(lead?.sfx);
+    const sfxNamesFromLead = sfxArray.map(s => s.name);
     
     // Find SFX names in lead that aren't in config
     const missingSfxNames = sfxNamesFromLead.filter(name => 
@@ -189,7 +207,10 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         status: lead.status || 'new',
         assignedTo: lead.assignedTo?._id || undefined,
         typesOfEvent: typesOfEvent.length > 0 ? typesOfEvent : undefined,
-        sfx: lead.sfx?.length > 0 ? lead.sfx.map(s => ({ name: s.name, quantity: String(s.quantity ?? '') })) : undefined,
+        sfx: (() => {
+          const sfxArray = convertSfxToArray(lead.sfx);
+          return sfxArray.length > 0 ? sfxArray : undefined;
+        })(),
         baraat: lead.baraatDetails ? Object.entries(lead.baraatDetails).map(([name, quantity]) => ({ 
           name, 
           quantity: String(quantity ?? '') 

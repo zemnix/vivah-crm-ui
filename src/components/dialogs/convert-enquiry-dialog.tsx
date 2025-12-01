@@ -4,7 +4,6 @@ import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { DatePicker } from "@/components/ui/date-picker";
@@ -13,60 +12,18 @@ import { useUserStore } from "@/store/admin/userStore";
 import { useLeadStore } from "@/store/leadStore";
 import { useAuthStore } from "@/store/authStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
+import { useSfxConfigStore } from "@/store/sfxConfigStore";
+import { Card } from "@/components/ui/card";
 import type { Enquiry, ConvertEnquiryToLeadData } from "@/api/enquiryApi";
-import type { BaraatFieldConfig } from "@/api/baraatConfigApi";
 import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
-import { Loader } from "lucide-react";
-
-// Dynamic baraat details schema - will be built based on active fields
-const createBaraatDetailsSchema = (activeFields: BaraatFieldConfig[]) => {
-  const baraatDetailsShape: Record<string, z.ZodTypeAny> = {};
-  
-  activeFields.forEach((field) => {
-    let fieldSchema: z.ZodTypeAny;
-    
-    switch (field.type) {
-      case 'text':
-        fieldSchema = z.string();
-        break;
-      case 'number':
-        fieldSchema = z.number().or(z.string().transform((val) => {
-          const num = Number(val);
-          return isNaN(num) ? undefined : num;
-        })).optional();
-        break;
-      case 'textarea':
-        fieldSchema = z.string();
-        break;
-      case 'dropdown':
-        fieldSchema = z.string();
-        break;
-      default:
-        fieldSchema = z.string();
-    }
-    
-    if (field.required) {
-      if (field.type === 'number') {
-        fieldSchema = z.number({ required_error: `${field.label} is required` });
-      } else {
-        fieldSchema = fieldSchema.min(1, `${field.label} is required`);
-      }
-    } else {
-      fieldSchema = fieldSchema.optional().or(z.literal("")).or(z.null());
-    }
-    
-    baraatDetailsShape[field.key] = fieldSchema;
-  });
-  
-  return z.object(baraatDetailsShape).optional();
-};
+import { Loader, Plus, X } from "lucide-react";
 
 // Convert enquiry form schema
 // Note: name and numberOfGuests come from enquiry and are read-only
 // Only date and dayNight are editable
-const createConvertEnquirySchema = (activeFields: BaraatFieldConfig[]) => {
+const createConvertEnquirySchema = () => {
   return z.object({
     assignedTo: z.string().optional(),
     typesOfEvent: z.array(
@@ -77,7 +34,18 @@ const createConvertEnquirySchema = (activeFields: BaraatFieldConfig[]) => {
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"), // Read-only from enquiry
       })
     ).min(1, "At least one event is required"), // Required - always have enquiry events
-    baraatDetails: createBaraatDetailsSchema(activeFields),
+    sfx: z.array(
+      z.object({
+        name: z.string().min(1, "SFX name is required"),
+        quantity: z.string().min(1, "Quantity is required"),
+      })
+    ).optional(),
+    baraat: z.array(
+      z.object({
+        name: z.string().min(1, "Baraat name is required"),
+        quantity: z.string().min(1, "Quantity is required"),
+      })
+    ).optional(),
   });
 };
 
@@ -94,15 +62,16 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
   const { users, fetchAllUsers } = useUserStore();
   const { fetchLeads } = useLeadStore();
   const { user } = useAuthStore();
-  const { activeFields, fetchActiveFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
+  const { fields: baraatFields, fetchAllFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
+  const { sfxConfigs, fetchAllSfxConfigs, loading: sfxLoading } = useSfxConfigStore();
   const navigate = useNavigate();
   const { toast } = useToast();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Sort active fields by order
-  const sortedActiveFields = useMemo(() => {
-    return [...activeFields].sort((a, b) => a.order - b.order);
-  }, [activeFields]);
+  // Sort baraat fields by name
+  const sortedBaraatFields = useMemo(() => {
+    return [...baraatFields].sort((a, b) => a.name.localeCompare(b.name));
+  }, [baraatFields]);
 
   // Filter users to get only staff for assignment
   const staffMembers = useMemo(() => 
@@ -110,8 +79,8 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
     [users]
   );
 
-  // Create schema based on active fields
-  const convertEnquirySchema = useMemo(() => createConvertEnquirySchema(sortedActiveFields), [sortedActiveFields]);
+  // Create schema
+  const convertEnquirySchema = useMemo(() => createConvertEnquirySchema(), []);
 
   // Initialize form with default values - always use enquiry events
   const getDefaultValues = (): ConvertEnquiryForm => {
@@ -124,14 +93,16 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
           dayNight: 'both' as const, // Default - editable
           numberOfGuests: event.numberOfGuests, // From enquiry - read-only
         })),
-        baraatDetails: {},
+        sfx: undefined,
+        baraat: undefined,
       };
     }
     // This shouldn't happen if enquiry has events, but handle gracefully
     return {
       assignedTo: undefined,
       typesOfEvent: [],
-      baraatDetails: {},
+      sfx: undefined,
+      baraat: undefined,
     };
   };
 
@@ -140,25 +111,22 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
     defaultValues: getDefaultValues(),
   });
 
-  // Reset form when enquiry changes or when fields are loaded
+  // Reset form when enquiry changes
   useEffect(() => {
-    if (open && sortedActiveFields.length >= 0) {
-      // Only reset if we have an enquiry or if fields are loaded (to avoid resetting during initial load)
-      const shouldReset = enquiry || sortedActiveFields.length > 0;
-      if (shouldReset) {
-        form.reset(getDefaultValues());
-      }
+    if (open && enquiry) {
+      form.reset(getDefaultValues());
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [enquiry?._id, sortedActiveFields.length, open]);
+  }, [enquiry?._id, open]);
 
   // Fetch data when dialog opens
   useEffect(() => {
     if (open) {
       fetchAllUsers({ role: undefined, page: 1, limit: 100 });
-      fetchActiveFields();
+      fetchAllFields();
+      fetchAllSfxConfigs();
     }
-  }, [open, fetchAllUsers, fetchActiveFields]);
+  }, [open, fetchAllUsers, fetchAllFields, fetchAllSfxConfigs]);
 
   const onSubmit = async (data: ConvertEnquiryForm) => {
     if (!enquiry) return;
@@ -166,6 +134,22 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
     setIsSubmitting(true);
     
     try {
+      // Prepare SFX data - convert array to map for backend
+      const sfxData = data.sfx?.filter(sfx => sfx.name && sfx.quantity).map(sfx => ({
+        name: sfx.name,
+        quantity: sfx.quantity,
+      }));
+
+      // Prepare baraat data - convert array to map for backend
+      const baraatDetailsData: Record<string, string | number | null> = {};
+      if (data.baraat) {
+        data.baraat.forEach((item) => {
+          if (item.name && item.quantity) {
+            baraatDetailsData[item.name] = item.quantity;
+          }
+        });
+      }
+
       // Always send typesOfEvent - they're required and come from enquiry
       // Backend will preserve enquiry's name and numberOfGuests, only use date/dayNight from form
       const convertData: ConvertEnquiryToLeadData = {
@@ -176,7 +160,8 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
           dayNight: event.dayNight,
           numberOfGuests: event.numberOfGuests, // Backend will use enquiry's value, but we send it for matching
         })),
-        baraatDetails: data.baraatDetails || undefined,
+        sfx: sfxData && sfxData.length > 0 ? sfxData : undefined,
+        baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
       };
 
       const lead = await convertEnquiryToLead(enquiry._id, convertData);
@@ -213,129 +198,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
   // Note: We don't allow adding/removing events - they come from the enquiry
   // Users can only edit dates and day/night preferences
 
-  // Render baraat field based on type
-  const renderBaraatField = (field: BaraatFieldConfig) => {
-    const fieldName = `baraatDetails.${field.key}` as const;
-    
-    switch (field.type) {
-      case 'text':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    {...formField}
-                    value={formField.value || ''}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'number':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    {...formField}
-                    value={formField.value || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      formField.onChange(value ? Number(value) : undefined);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'textarea':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                </FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    rows={3}
-                    {...formField}
-                    value={formField.value || ''}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'dropdown':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                </FormLabel>
-                <Select
-                  onValueChange={formField.onChange}
-                  value={formField.value || ""}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {field.dropdownOptions?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  const isPending = loading || isSubmitting || baraatFieldsLoading;
+  const isPending = loading || isSubmitting || baraatFieldsLoading || sfxLoading;
 
   if (!enquiry) return null;
 
@@ -349,7 +212,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
           </DialogDescription>
         </DialogHeader>
 
-        {baraatFieldsLoading ? (
+        {(baraatFieldsLoading || sfxLoading) ? (
           <div className="flex items-center justify-center py-8">
             <Loader className="animate-spin h-6 w-6" />
             <span className="ml-2">Loading form fields...</span>
@@ -518,15 +381,223 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
               ))}
             </div>
 
-            {/* Baraat Details Section */}
-            {sortedActiveFields.length > 0 && (
-              <div className="space-y-4">
-                <h3 className="text-lg font-semibold">Baraat Details</h3>
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {sortedActiveFields.map((field) => renderBaraatField(field))}
-                </div>
+            {/* SFX Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentSfx = form.getValues("sfx") || [];
+                    form.setValue("sfx", [
+                      ...currentSfx,
+                      {
+                        name: "",
+                        quantity: "",
+                      },
+                    ]);
+                  }}
+                  disabled={isSubmitting || loading || sfxLoading}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add SFX
+                </Button>
               </div>
-            )}
+
+              {form.watch("sfx")?.map((sfx, index) => (
+                <Card key={index} className="p-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <h4 className="font-medium text-sm">SFX {index + 1}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const currentSfx = form.getValues("sfx") || [];
+                        form.setValue(
+                          "sfx",
+                          currentSfx.filter((_, i) => i !== index)
+                        );
+                      }}
+                      disabled={isSubmitting || loading}
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* SFX Name - Dropdown from SFX Config */}
+                    <FormField
+                      control={form.control}
+                      name={`sfx.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>SFX Name *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                            disabled={isSubmitting || loading || sfxLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select SFX" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {sfxConfigs.map((sfxConfig) => (
+                                <SelectItem key={sfxConfig._id} value={sfxConfig.name}>
+                                  {sfxConfig.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Quantity */}
+                    <FormField
+                      control={form.control}
+                      name={`sfx.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="Enter quantity"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isSubmitting || loading}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Card>
+              ))}
+
+              {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
+                <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                  No SFX added. Click "Add SFX" to add special effects.
+                </div>
+              )}
+            </div>
+
+            {/* Baraat Section */}
+            <div className="space-y-4">
+              <div className="flex items-center justify-between">
+                <h3 className="text-lg font-semibold">Baraat</h3>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    const currentBaraat = form.getValues("baraat") || [];
+                    form.setValue("baraat", [
+                      ...currentBaraat,
+                      {
+                        name: "",
+                        quantity: "",
+                      },
+                    ]);
+                  }}
+                  disabled={isSubmitting || loading || baraatFieldsLoading}
+                >
+                  <Plus className="h-4 w-4 mr-1" />
+                  Add Baraat
+                </Button>
+              </div>
+
+              {form.watch("baraat")?.map((baraat, index) => (
+                <Card key={index} className="p-4">
+                  <div className="flex items-start justify-between mb-4">
+                    <h4 className="font-medium text-sm">Baraat {index + 1}</h4>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      onClick={() => {
+                        const currentBaraat = form.getValues("baraat") || [];
+                        form.setValue(
+                          "baraat",
+                          currentBaraat.filter((_, i) => i !== index)
+                        );
+                      }}
+                      disabled={isSubmitting || loading}
+                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                    >
+                      <X className="h-4 w-4" />
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    {/* Baraat Name - Dropdown from Baraat Config */}
+                    <FormField
+                      control={form.control}
+                      name={`baraat.${index}.name`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Baraat Name *</FormLabel>
+                          <Select
+                            onValueChange={field.onChange}
+                            value={field.value || ""}
+                            disabled={isSubmitting || loading || baraatFieldsLoading}
+                          >
+                            <FormControl>
+                              <SelectTrigger>
+                                <SelectValue placeholder="Select baraat" />
+                              </SelectTrigger>
+                            </FormControl>
+                            <SelectContent>
+                              {sortedBaraatFields.map((baraatConfig) => (
+                                <SelectItem key={baraatConfig._id} value={baraatConfig.name}>
+                                  {baraatConfig.name}
+                                </SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    {/* Quantity */}
+                    <FormField
+                      control={form.control}
+                      name={`baraat.${index}.quantity`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Quantity *</FormLabel>
+                          <FormControl>
+                            <Input
+                              type="text"
+                              placeholder="Enter quantity"
+                              {...field}
+                              value={field.value || ""}
+                              disabled={isSubmitting || loading}
+                            />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+                  </div>
+                </Card>
+              ))}
+
+              {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
+                <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                  No baraat added. Click "Add Baraat" to add baraat details.
+                </div>
+              )}
+            </div>
 
             {/* Form Actions */}
             <div className="flex justify-end gap-2 pt-4">
