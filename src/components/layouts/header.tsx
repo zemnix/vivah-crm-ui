@@ -47,7 +47,7 @@ export function Header({ onMenuClick, user }: HeaderProps) {
           // theme === 'light' ? "bg-gray-900" : ""
         )}>
           <img
-            src="/vivahlogo.png"
+            src="/vivahlogo.jpg"
             alt="Vivah"
             className="h-8 sm:h-10 w-auto object-contain"
           />
