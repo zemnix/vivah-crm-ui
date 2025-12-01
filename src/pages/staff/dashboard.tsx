@@ -225,7 +225,7 @@ export default function StaffDashboard() {
           <div>
             <h1 className="text-3xl font-bold tracking-tight">Staff Dashboard</h1>
             <p className="text-muted-foreground">
-              Monitor your interactions and quotations performance
+              Monitor your interactions performance
             </p>
           </div>
           <div className="flex items-center space-x-2 mt-4 sm:mt-0">
@@ -364,7 +364,7 @@ export default function StaffDashboard() {
         </div>
 
         {/* Quotation Stats Cards */}
-        <div>
+        <div className="hidden">
           <h2 className="text-2xl font-bold mb-4">Quotations</h2>
           <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
             {quotationStatsCards.map((stat) => (
@@ -465,7 +465,7 @@ export default function StaffDashboard() {
         </div>
 
         {/* Quotation Charts */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 hidden">
           {/* Quotation Timeline */}
           <Card>
             <CardHeader>
@@ -531,7 +531,7 @@ export default function StaffDashboard() {
           <CardHeader>
             <CardTitle>Performance Overview</CardTitle>
             <CardDescription>
-              Interaction completion rate and quotation success rate over time
+              Interaction completion rate over time
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -548,13 +548,6 @@ export default function StaffDashboard() {
                     stroke="#00C49F"
                     strokeWidth={2}
                     name="Completed Interactions"
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="accepted"
-                    stroke="#0088FE"
-                    strokeWidth={2}
-                    name="Accepted Quotations"
                   />
                 </LineChart>
               </ResponsiveContainer>

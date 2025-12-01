@@ -39,7 +39,6 @@ interface BaraatConfigStore {
   
   // Utility Actions
   getFieldByKey: (key: string) => BaraatFieldConfig | undefined;
-  getFieldsByType: (type: string) => BaraatFieldConfig[];
   refreshFields: () => Promise<void>;
   resetStore: () => void;
 }
@@ -71,6 +70,7 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
         try {
           const fields = await getActiveBaraatFieldConfigsApi();
           set({
+            fields,
             activeFields: fields,
             loading: false,
           });
@@ -87,8 +87,8 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
         try {
           const fields = await getAllBaraatFieldConfigsApi();
           set({
-            fields: fields,
-            activeFields: fields.filter((f) => f.isActive),
+            fields,
+            activeFields: fields,
             loading: false,
           });
         } catch (error) {
@@ -106,13 +106,11 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
 
           // Add to fields list
           const currentFields = get().fields;
-          const updatedFields = [...currentFields, newField].sort((a, b) => a.order - b.order);
+          const updatedFields = [...currentFields, newField].sort((a, b) => a.name.localeCompare(b.name));
 
           set({
             fields: updatedFields,
-            activeFields: newField.isActive
-              ? [...get().activeFields, newField].sort((a, b) => a.order - b.order)
-              : get().activeFields,
+            activeFields: updatedFields,
             loading: false,
           });
 
@@ -135,34 +133,11 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
           const currentFields = get().fields;
           const updatedFields = currentFields
             .map((field) => (field._id === fieldId ? updatedField : field))
-            .sort((a, b) => a.order - b.order);
-
-          // Update active fields if needed
-          const currentActiveFields = get().activeFields;
-          let updatedActiveFields: BaraatFieldConfig[];
-
-          if (updatedField.isActive) {
-            // If field is active, add or update it in activeFields
-            const existingIndex = currentActiveFields.findIndex((f) => f._id === fieldId);
-            if (existingIndex >= 0) {
-              updatedActiveFields = currentActiveFields
-                .map((field) => (field._id === fieldId ? updatedField : field))
-                .sort((a, b) => a.order - b.order);
-            } else {
-              updatedActiveFields = [...currentActiveFields, updatedField].sort(
-                (a, b) => a.order - b.order
-              );
-            }
-          } else {
-            // If field is not active, remove it from activeFields
-            updatedActiveFields = currentActiveFields
-              .filter((field) => field._id !== fieldId)
-              .sort((a, b) => a.order - b.order);
-          }
+            .sort((a, b) => a.name.localeCompare(b.name));
 
           set({
             fields: updatedFields,
-            activeFields: updatedActiveFields,
+            activeFields: updatedFields,
             selectedField:
               get().selectedField?._id === fieldId ? updatedField : get().selectedField,
             loading: false,
@@ -181,21 +156,15 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
       deleteField: async (fieldId, hardDelete = false) => {
         set({ loading: true, error: null });
         try {
-          await deleteBaraatFieldConfigApi(fieldId, hardDelete);
+          await deleteBaraatFieldConfigApi(fieldId, true);
 
           // Remove from fields list
           const currentFields = get().fields;
           const filteredFields = currentFields.filter((field) => field._id !== fieldId);
 
-          // Remove from active fields
-          const currentActiveFields = get().activeFields;
-          const filteredActiveFields = currentActiveFields.filter(
-            (field) => field._id !== fieldId
-          );
-
           set({
             fields: filteredFields,
-            activeFields: filteredActiveFields,
+            activeFields: filteredFields,
             selectedField: get().selectedField?._id === fieldId ? null : get().selectedField,
             loading: false,
           });
@@ -212,11 +181,7 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
 
       // Utility Actions
       getFieldByKey: (key) => {
-        return get().fields.find((field) => field.key === key);
-      },
-
-      getFieldsByType: (type) => {
-        return get().fields.filter((field) => field.type === type);
+        return get().fields.find((field) => field.name === key);
       },
 
       refreshFields: async () => {

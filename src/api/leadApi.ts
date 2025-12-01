@@ -19,10 +19,10 @@ export interface TypeOfEvent {
   numberOfGuests: number;
 }
 
-// SFX based on backend model
+// SFX based on backend model (quantity stored as free-form text)
 export interface Sfx {
   name: string;
-  quantity: number;
+  quantity: string;
 }
 
 // Lead types based on backend model

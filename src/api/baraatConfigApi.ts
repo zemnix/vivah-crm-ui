@@ -1,39 +1,19 @@
 import apiClient from './apiClient';
 
-// Baraat Field Config types based on backend model
-export type FieldType = 'text' | 'number' | 'textarea' | 'dropdown';
-
+// Baraat Field Config types based on simplified backend model
 export interface BaraatFieldConfig {
   _id: string;
-  label: string;
-  key: string;
-  type: FieldType;
-  dropdownOptions?: string[];
-  required: boolean;
-  order: number;
-  isActive: boolean;
+  name: string;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface BaraatFieldConfigCreateData {
-  label: string;
-  key?: string; // Auto-generated from label if not provided
-  type: FieldType;
-  dropdownOptions?: string[]; // Required if type is 'dropdown'
-  required?: boolean;
-  order?: number;
-  isActive?: boolean;
+  name: string;
 }
 
 export interface BaraatFieldConfigUpdateData {
-  label?: string;
-  key?: string;
-  type?: FieldType;
-  dropdownOptions?: string[];
-  required?: boolean;
-  order?: number;
-  isActive?: boolean;
+  name?: string;
 }
 
 // Baraat Field Config API functions

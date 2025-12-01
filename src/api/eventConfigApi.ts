@@ -1,23 +1,19 @@
 import apiClient from './apiClient';
 
-// Event Config types based on backend model
+// Event Config types based on simplified backend model
 export interface EventConfig {
   _id: string;
   name: string;
-  description: string;
-  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface EventConfigCreateData {
   name: string;
-  description: string;
 }
 
 export interface EventConfigUpdateData {
   name?: string;
-  description?: string;
 }
 
 // Event Config API functions

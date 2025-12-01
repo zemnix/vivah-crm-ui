@@ -862,7 +862,7 @@ export default function QuotationsPage({
         <div className="text-center">
           <h1 className="text-4xl sm:text-5xl font-bold text-foreground mb-4">Coming Soon</h1>
           <p className="text-lg text-muted-foreground">
-            This page is under development and will be available shortly.
+            This page will be available in the next release.
           </p>
         </div>
       </div>

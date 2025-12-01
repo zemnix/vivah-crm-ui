@@ -2,9 +2,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, MoreHorizontal, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useEventConfigStore } from "@/store/eventConfigStore";
 import { EventConfigDialog } from "@/components/dialogs/event-config-dialog";
@@ -28,8 +26,6 @@ export default function AdminEventConfig() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedEvent, setSelectedEvent] = useState<EventConfig | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
-  const [selectedStatuses, setSelectedStatuses] = useState<('active' | 'inactive')[]>(['active', 'inactive']);
-  const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => {
     fetchAllEvents();
@@ -70,34 +66,21 @@ export default function AdminEventConfig() {
     if (success) {
       toast({
         title: "Success",
-        description: "Event deactivated successfully",
+        description: "Event deleted successfully",
       });
       setDeleteDialogOpen(false);
       setSelectedEvent(null);
     } else {
       toast({
         title: "Error",
-        description: "Failed to deactivate event",
+        description: "Failed to delete event",
         variant: "destructive",
       });
     }
   };
 
-  // Filter events based on selected statuses
-  const filteredEvents = useMemo(() => {
-    if (selectedStatuses.length === 2) {
-      return events; // Show all if both are selected
-    }
-    return events.filter((event) => {
-      if (selectedStatuses.includes('active')) {
-        return event.isActive;
-      }
-      if (selectedStatuses.includes('inactive')) {
-        return !event.isActive;
-      }
-      return false;
-    });
-  }, [events, selectedStatuses]);
+  // With simplified event config (name only), just use all events
+  const filteredEvents = useMemo(() => events, [events]);
 
   const columns = [
     {
@@ -107,22 +90,6 @@ export default function AdminEventConfig() {
         <div className="font-medium text-foreground">{value}</div>
       ),
       sortable: true,
-    },
-    {
-      key: 'description',
-      header: 'Description',
-      render: (value: string) => (
-        <div className="text-sm text-muted-foreground line-clamp-2">{value}</div>
-      ),
-    },
-    {
-      key: 'isActive',
-      header: 'Status',
-      render: (value: boolean) => (
-        <Badge variant={value ? "default" : "secondary"}>
-          {value ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
     {
       key: 'createdAt',
@@ -178,83 +145,6 @@ export default function AdminEventConfig() {
           </Button>
         </div>
 
-        {/* Filter Bar */}
-        <Card>
-          <CardContent className="p-3 sm:p-4 pb-1">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">Filters</span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {selectedStatuses.length < 2 && (
-                    <Badge variant="outline" className="text-xs font-medium">
-                      {selectedStatuses.includes('active') ? 'Active' : 'Inactive'}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {showFilters ? 'Collapse' : 'Expand'}
-                </Button>
-              </div>
-            </div>
-
-            {showFilters && (
-              <div className="flex flex-col sm:flex-row items-start gap-4 pb-2">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="filter-active"
-                      checked={selectedStatuses.includes('active')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedStatuses([...selectedStatuses, 'active']);
-                        } else {
-                          setSelectedStatuses(selectedStatuses.filter(s => s !== 'active'));
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="filter-active"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Active
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="filter-inactive"
-                      checked={selectedStatuses.includes('inactive')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedStatuses([...selectedStatuses, 'inactive']);
-                        } else {
-                          setSelectedStatuses(selectedStatuses.filter(s => s !== 'inactive'));
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="filter-inactive"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Inactive
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
-
         <Card>
           <CardHeader>
             <CardTitle>Events</CardTitle>
@@ -286,8 +176,8 @@ export default function AdminEventConfig() {
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           onConfirm={confirmDelete}
-          title="Deactivate Event"
-          description="Are you sure you want to deactivate this event? It will no longer appear in dropdowns for new leads, but existing leads will still have access to it."
+          title="Delete Event"
+          description="Are you sure you want to delete this event? This action cannot be undone."
           itemName={selectedEvent?.name || ""}
           itemType="event"
           isLoading={loading}

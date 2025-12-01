@@ -150,29 +150,17 @@ export const useSfxConfigStore = create<SfxConfigStore>()(
       deleteSfx: async (sfxId, hardDelete = false) => {
         set({ loading: true, error: null });
         try {
-          await deleteSfxConfigApi(sfxId, hardDelete);
+          // Backend now always hard-deletes SFX configs; ignore hardDelete flag
+          await deleteSfxConfigApi(sfxId, true);
 
-          if (hardDelete) {
-            // Remove from sfxConfigs list
-            const currentSfxConfigs = get().sfxConfigs;
-            const filteredSfxConfigs = currentSfxConfigs.filter((sfx) => sfx._id !== sfxId);
-            set({
-              sfxConfigs: filteredSfxConfigs,
-              selectedSfx: get().selectedSfx?._id === sfxId ? null : get().selectedSfx,
-              loading: false,
-            });
-          } else {
-            // Mark as inactive in sfxConfigs list
-            const currentSfxConfigs = get().sfxConfigs;
-            const updatedSfxConfigs = currentSfxConfigs.map((sfx) =>
-              sfx._id === sfxId ? { ...sfx, isActive: false } : sfx
-            );
-            set({
-              sfxConfigs: updatedSfxConfigs,
-              selectedSfx: get().selectedSfx?._id === sfxId ? null : get().selectedSfx,
-              loading: false,
-            });
-          }
+          // Remove from sfxConfigs list locally
+          const currentSfxConfigs = get().sfxConfigs;
+          const filteredSfxConfigs = currentSfxConfigs.filter((sfx) => sfx._id !== sfxId);
+          set({
+            sfxConfigs: filteredSfxConfigs,
+            selectedSfx: get().selectedSfx?._id === sfxId ? null : get().selectedSfx,
+            loading: false,
+          });
 
           return true;
         } catch (error) {

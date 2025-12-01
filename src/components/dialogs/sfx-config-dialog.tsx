@@ -11,7 +11,6 @@ import type { SfxConfig, SfxConfigCreateData, SfxConfigUpdateData } from "@/api/
 
 const sfxConfigSchema = z.object({
   name: z.string().min(1, "SFX name is required").max(100, "SFX name must be less than 100 characters"),
-  quantity: z.number().min(1, "Quantity must be at least 1").int("Quantity must be a whole number"),
 });
 
 type SfxConfigForm = z.infer<typeof sfxConfigSchema>;
@@ -31,7 +30,6 @@ export function SfxConfigDialog({ open, onOpenChange, sfx, mode }: SfxConfigDial
     resolver: zodResolver(sfxConfigSchema),
     defaultValues: {
       name: sfx?.name || "",
-      quantity: sfx?.quantity || 1,
     },
   });
 
@@ -40,7 +38,6 @@ export function SfxConfigDialog({ open, onOpenChange, sfx, mode }: SfxConfigDial
     if (open) {
       form.reset({
         name: sfx?.name || "",
-        quantity: sfx?.quantity || 1,
       });
     }
   }, [sfx, open, form]);
@@ -51,7 +48,6 @@ export function SfxConfigDialog({ open, onOpenChange, sfx, mode }: SfxConfigDial
       if (mode === 'create') {
         const sfxData: SfxConfigCreateData = {
           name: data.name.trim(),
-          quantity: data.quantity,
         };
         const result = await createSfx(sfxData);
         if (result) {
@@ -61,7 +57,6 @@ export function SfxConfigDialog({ open, onOpenChange, sfx, mode }: SfxConfigDial
       } else if (sfx) {
         const updateData: SfxConfigUpdateData = {
           name: data.name.trim(),
-          quantity: data.quantity,
         };
         const result = await updateSfx(sfx._id, updateData);
         if (result) {
@@ -102,27 +97,6 @@ export function SfxConfigDialog({ open, onOpenChange, sfx, mode }: SfxConfigDial
               )}
             />
 
-            <FormField
-              control={form.control}
-              name="quantity"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Quantity *</FormLabel>
-                  <FormControl>
-                    <Input
-                      type="number"
-                      placeholder="Enter quantity"
-                      min="1"
-                      {...field}
-                      onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                      value={field.value || ""}
-                      disabled={isSubmitting || loading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
 
             <div className="flex justify-end gap-2 pt-4">
               <Button

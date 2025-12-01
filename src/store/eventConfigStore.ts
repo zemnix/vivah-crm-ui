@@ -150,29 +150,17 @@ export const useEventConfigStore = create<EventConfigStore>()(
       deleteEvent: async (eventId, hardDelete = false) => {
         set({ loading: true, error: null });
         try {
-          await deleteEventConfigApi(eventId, hardDelete);
+          // Backend now always hard-deletes events; ignore hardDelete flag
+          await deleteEventConfigApi(eventId, true);
 
-          if (hardDelete) {
-            // Remove from events list
-            const currentEvents = get().events;
-            const filteredEvents = currentEvents.filter((event) => event._id !== eventId);
-            set({
-              events: filteredEvents,
-              selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
-              loading: false,
-            });
-          } else {
-            // Mark as inactive in events list
-            const currentEvents = get().events;
-            const updatedEvents = currentEvents.map((event) =>
-              event._id === eventId ? { ...event, isActive: false } : event
-            );
-            set({
-              events: updatedEvents,
-              selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
-              loading: false,
-            });
-          }
+          // Remove from events list locally
+          const currentEvents = get().events;
+          const filteredEvents = currentEvents.filter((event) => event._id !== eventId);
+          set({
+            events: filteredEvents,
+            selectedEvent: get().selectedEvent?._id === eventId ? null : get().selectedEvent,
+            loading: false,
+          });
 
           return true;
         } catch (error) {

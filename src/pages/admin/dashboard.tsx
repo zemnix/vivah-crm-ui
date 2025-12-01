@@ -532,7 +532,7 @@ export default function AdminDashboard() {
         </Card>
 
         {/* Main Feature: District-wise Quotation Analysis */}
-        <Card className="mb-6">
+        <Card className="mb-6 hidden">
           <CardHeader>
             <CardTitle className="flex items-center">
               <MapPin className="h-5 w-5 mr-2" />
@@ -620,7 +620,7 @@ export default function AdminDashboard() {
           </div>
 
           {/* Quotation Stats */}
-          <div>
+          <div className="hidden">
             <h2 className="text-2xl font-bold mb-4">Quotations</h2>
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-5">
               {quotationStatsCards.map((stat) => (
@@ -723,7 +723,7 @@ export default function AdminDashboard() {
         </div>
 
         {/* Quotation Charts */}
-        <div className="grid gap-6 md:grid-cols-2">
+        <div className="grid gap-6 md:grid-cols-2 hidden">
           {/* Quotation Timeline */}
           <Card>
             <CardHeader>

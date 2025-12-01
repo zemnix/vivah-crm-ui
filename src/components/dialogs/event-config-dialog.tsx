@@ -12,7 +12,6 @@ import type { EventConfig, EventConfigCreateData, EventConfigUpdateData } from "
 
 const eventConfigSchema = z.object({
   name: z.string().min(1, "Event name is required").max(100, "Event name must be less than 100 characters"),
-  description: z.string().min(1, "Description is required").max(500, "Description must be less than 500 characters"),
 });
 
 type EventConfigForm = z.infer<typeof eventConfigSchema>;
@@ -32,7 +31,6 @@ export function EventConfigDialog({ open, onOpenChange, event, mode }: EventConf
     resolver: zodResolver(eventConfigSchema),
     defaultValues: {
       name: event?.name || "",
-      description: event?.description || "",
     },
   });
 
@@ -41,7 +39,6 @@ export function EventConfigDialog({ open, onOpenChange, event, mode }: EventConf
     if (open) {
       form.reset({
         name: event?.name || "",
-        description: event?.description || "",
       });
     }
   }, [event, open, form]);
@@ -52,7 +49,6 @@ export function EventConfigDialog({ open, onOpenChange, event, mode }: EventConf
       if (mode === 'create') {
         const eventData: EventConfigCreateData = {
           name: data.name.trim(),
-          description: data.description.trim(),
         };
         const result = await createEvent(eventData);
         if (result) {
@@ -62,7 +58,6 @@ export function EventConfigDialog({ open, onOpenChange, event, mode }: EventConf
       } else if (event) {
         const updateData: EventConfigUpdateData = {
           name: data.name.trim(),
-          description: data.description.trim(),
         };
         const result = await updateEvent(event._id, updateData);
         if (result) {

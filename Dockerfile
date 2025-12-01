@@ -25,7 +25,7 @@ CMD ["serve", "-s", "dist", "-l", "8080"]
 # --- Deployment commands (for reference) ---
 
 # Build the image and push to Google Container Registry (GCR)
-# gcloud builds submit --tag gcr.io/quixotic-strand-476615-s0/vinayak-enterprises-frontend
+# gcloud builds submit --tag gcr.io/quixotic-strand-476615-s0/vivah-creationss-frontend
 
 # Deploy to Cloud Run
-# gcloud run deploy vinayak-enterprises-frontend --image gcr.io/quixotic-strand-476615-s0/vinayak-enterprises-frontend --platform managed --region asia-southeast1 --allow-unauthenticated
+# gcloud run deploy vivah-creationss-frontend --image gcr.io/quixotic-strand-476615-s0/vivah-creationss-frontend --platform managed --region asia-southeast1 --allow-unauthenticated

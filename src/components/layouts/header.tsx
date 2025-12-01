@@ -100,16 +100,6 @@ export function Header({ onMenuClick, user }: HeaderProps) {
               </div>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            {user.role === 'admin' && (
-              <>
-                <DropdownMenuItem>
-                  <Link to="/product-master">
-                    Product Master
-                  </Link>
-                </DropdownMenuItem>
-                <DropdownMenuSeparator />
-              </>
-            )}
 
             <DropdownMenuItem asChild>
               <Link to={user.role === 'admin' ? '/admin/settings' : '/staff/settings'} className="flex items-center">

@@ -70,7 +70,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
         )}>
           <img
             src="/vinayak_enterprise_logo.jpeg"
-            alt="Vinayak Enterprise"
+            alt="Vivah Creations"
             className="h-8 w-auto object-contain"
           />
         </div>

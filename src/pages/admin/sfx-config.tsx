@@ -2,9 +2,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { DataTable } from "@/components/ui/data-table";
-import { Badge } from "@/components/ui/badge";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Plus, Edit, Trash2, MoreHorizontal, Filter } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useSfxConfigStore } from "@/store/sfxConfigStore";
 import { SfxConfigDialog } from "@/components/dialogs/sfx-config-dialog";
@@ -28,8 +26,6 @@ export default function AdminSfxConfig() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [selectedSfx, setSelectedSfx] = useState<SfxConfig | null>(null);
   const [dialogMode, setDialogMode] = useState<'create' | 'edit'>('create');
-  const [selectedStatuses, setSelectedStatuses] = useState<('active' | 'inactive')[]>(['active', 'inactive']);
-  const [showFilters, setShowFilters] = useState(true);
 
   useEffect(() => {
     fetchAllSfxConfigs();
@@ -70,34 +66,21 @@ export default function AdminSfxConfig() {
     if (success) {
       toast({
         title: "Success",
-        description: "SFX config deactivated successfully",
+        description: "SFX config deleted successfully",
       });
       setDeleteDialogOpen(false);
       setSelectedSfx(null);
     } else {
       toast({
         title: "Error",
-        description: "Failed to deactivate SFX config",
+        description: "Failed to delete SFX config",
         variant: "destructive",
       });
     }
   };
 
-  // Filter SFX configs based on selected statuses
-  const filteredSfxConfigs = useMemo(() => {
-    if (selectedStatuses.length === 2) {
-      return sfxConfigs; // Show all if both are selected
-    }
-    return sfxConfigs.filter((sfx) => {
-      if (selectedStatuses.includes('active')) {
-        return sfx.isActive;
-      }
-      if (selectedStatuses.includes('inactive')) {
-        return !sfx.isActive;
-      }
-      return false;
-    });
-  }, [sfxConfigs, selectedStatuses]);
+  // With simplified SFX config (name only), just use all configs
+  const filteredSfxConfigs = useMemo(() => sfxConfigs, [sfxConfigs]);
 
   const columns = [
     {
@@ -107,23 +90,6 @@ export default function AdminSfxConfig() {
         <div className="font-medium text-foreground">{value}</div>
       ),
       sortable: true,
-    },
-    {
-      key: 'quantity',
-      header: 'Quantity',
-      render: (value: number) => (
-        <div className="text-sm text-muted-foreground">{value}</div>
-      ),
-      sortable: true,
-    },
-    {
-      key: 'isActive',
-      header: 'Status',
-      render: (value: boolean) => (
-        <Badge variant={value ? "default" : "secondary"}>
-          {value ? "Active" : "Inactive"}
-        </Badge>
-      ),
     },
     {
       key: 'createdAt',
@@ -170,7 +136,7 @@ export default function AdminSfxConfig() {
           <div>
             <h1 className="text-2xl sm:text-3xl font-bold text-foreground">SFX Configuration</h1>
             <p className="text-muted-foreground mt-2">
-              Manage special effects (SFX) configurations with name and quantity
+              Manage special effects (SFX) configurations
             </p>
           </div>
           <Button onClick={handleCreate} className="w-full sm:w-auto">
@@ -178,83 +144,6 @@ export default function AdminSfxConfig() {
             Add SFX
           </Button>
         </div>
-
-        {/* Filter Bar */}
-        <Card>
-          <CardContent className="p-3 sm:p-4 pb-1">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between mb-3 gap-2">
-              <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                <div className="flex items-center gap-2">
-                  <Filter className="h-4 w-4 text-muted-foreground" />
-                  <span className="text-sm font-semibold text-foreground">Filters</span>
-                </div>
-                <div className="flex items-center gap-2 flex-wrap">
-                  {selectedStatuses.length < 2 && (
-                    <Badge variant="outline" className="text-xs font-medium">
-                      {selectedStatuses.includes('active') ? 'Active' : 'Inactive'}
-                    </Badge>
-                  )}
-                </div>
-              </div>
-
-              <div className="flex items-center gap-2">
-                <Button
-                  variant="ghost"
-                  size="sm"
-                  onClick={() => setShowFilters(!showFilters)}
-                  className="h-7 text-xs text-muted-foreground hover:text-foreground"
-                >
-                  {showFilters ? 'Collapse' : 'Expand'}
-                </Button>
-              </div>
-            </div>
-
-            {showFilters && (
-              <div className="flex flex-col sm:flex-row items-start gap-4 pb-2">
-                <div className="flex items-center gap-4">
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="filter-active"
-                      checked={selectedStatuses.includes('active')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedStatuses([...selectedStatuses, 'active']);
-                        } else {
-                          setSelectedStatuses(selectedStatuses.filter(s => s !== 'active'));
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="filter-active"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Active
-                    </label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <Checkbox
-                      id="filter-inactive"
-                      checked={selectedStatuses.includes('inactive')}
-                      onCheckedChange={(checked) => {
-                        if (checked) {
-                          setSelectedStatuses([...selectedStatuses, 'inactive']);
-                        } else {
-                          setSelectedStatuses(selectedStatuses.filter(s => s !== 'inactive'));
-                        }
-                      }}
-                    />
-                    <label
-                      htmlFor="filter-inactive"
-                      className="text-sm font-medium leading-none peer-disabled:cursor-not-allowed peer-disabled:opacity-70 cursor-pointer"
-                    >
-                      Inactive
-                    </label>
-                  </div>
-                </div>
-              </div>
-            )}
-          </CardContent>
-        </Card>
 
         <Card>
           <CardHeader>
@@ -287,8 +176,8 @@ export default function AdminSfxConfig() {
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
           onConfirm={confirmDelete}
-          title="Deactivate SFX Config"
-          description="Are you sure you want to deactivate this SFX config? It will no longer appear in dropdowns, but existing data will still have access to it."
+          title="Delete SFX Config"
+          description="Are you sure you want to delete this SFX config? This action cannot be undone."
           itemName={selectedSfx?.name || ""}
           itemType="SFX config"
           isLoading={loading}

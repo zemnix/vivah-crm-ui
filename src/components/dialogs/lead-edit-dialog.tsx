@@ -16,10 +16,8 @@ import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { useEventConfigStore } from "@/store/eventConfigStore";
 import { useSfxConfigStore } from "@/store/sfxConfigStore";
 import type { Lead, LeadUpdateData, LeadStatus } from "@/api/leadApi";
-import type { BaraatFieldConfig } from "@/api/baraatConfigApi";
 import { useEffect, useState, useMemo } from "react";
-import { Loader, AlertCircle, Plus, X } from "lucide-react";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader, Plus, X } from "lucide-react";
 
 // Customer schema
 const customerSchema = z.object({
@@ -32,73 +30,8 @@ const customerSchema = z.object({
   venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
 });
 
-// Dynamic baraat details schema - includes all fields (active + inactive) and legacy fields
-const createBaraatDetailsSchema = (
-  allFields: BaraatFieldConfig[],
-  legacyFields: Array<{ key: string; value: any }>
-) => {
-  const baraatDetailsShape: Record<string, z.ZodTypeAny> = {};
-  
-  // Add all config fields (active + inactive)
-  allFields.forEach((field) => {
-    let fieldSchema: z.ZodTypeAny;
-    
-    switch (field.type) {
-      case 'text':
-        fieldSchema = z.string();
-        break;
-      case 'number':
-        fieldSchema = z.number().or(z.string().transform((val) => {
-          const num = Number(val);
-          return isNaN(num) ? undefined : num;
-        })).optional();
-        break;
-      case 'textarea':
-        fieldSchema = z.string();
-        break;
-      case 'dropdown':
-        fieldSchema = z.string();
-        break;
-      default:
-        fieldSchema = z.string();
-    }
-    
-    if (field.required) {
-      if (field.type === 'number') {
-        fieldSchema = z.number({ required_error: `${field.label} is required` });
-      } else {
-        fieldSchema = fieldSchema.min(1, `${field.label} is required`);
-      }
-    } else {
-      fieldSchema = fieldSchema.optional().or(z.literal("")).or(z.null());
-    }
-    
-    baraatDetailsShape[field.key] = fieldSchema;
-  });
-  
-  // Add legacy fields as optional strings/numbers
-  legacyFields.forEach(({ key, value }) => {
-    if (!baraatDetailsShape[key]) {
-      // Try to infer type from existing value
-      if (typeof value === 'number') {
-        baraatDetailsShape[key] = z.number().optional().or(z.string().transform((val) => {
-          const num = Number(val);
-          return isNaN(num) ? undefined : num;
-        })).optional();
-      } else {
-        baraatDetailsShape[key] = z.string().optional().or(z.literal("")).or(z.null());
-      }
-    }
-  });
-  
-  return z.object(baraatDetailsShape).optional();
-};
-
 // Lead form schema for editing
-const createLeadEditSchema = (
-  allFields: BaraatFieldConfig[],
-  legacyFields: Array<{ key: string; value: any }>
-) => {
+const createLeadEditSchema = () => {
   return z.object({
     customer: customerSchema,
     status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const),
@@ -114,10 +47,15 @@ const createLeadEditSchema = (
     sfx: z.array(
       z.object({
         name: z.string().min(1, "SFX name is required"),
-        quantity: z.number().min(1, "Quantity must be at least 1"),
+        quantity: z.string().min(1, "Quantity is required"),
       })
     ).optional(),
-    baraatDetails: createBaraatDetailsSchema(allFields, legacyFields),
+    baraat: z.array(
+      z.object({
+        name: z.string().min(1, "Baraat name is required"),
+        quantity: z.string().min(1, "Quantity is required"),
+      })
+    ).optional(),
   });
 };
 
@@ -138,35 +76,6 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
   const { sfxConfigs, fetchAllSfxConfigs, loading: sfxLoading } = useSfxConfigStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
-  // Detect legacy fields (fields in lead.baraatDetails that are not in config)
-  const legacyFields = useMemo(() => {
-    if (!lead?.baraatDetails) return [];
-    
-    const configFieldKeys = new Set(allFields.map(f => f.key));
-    const legacy: Array<{ key: string; value: any }> = [];
-    
-    Object.entries(lead.baraatDetails).forEach(([key, value]) => {
-      if (!configFieldKeys.has(key)) {
-        legacy.push({ key, value });
-      }
-    });
-    
-    return legacy;
-  }, [lead?.baraatDetails, allFields]);
-
-  // Get fields that the lead has (active + inactive from config)
-  // For editing, we show all config fields (active + inactive) that exist in the lead's data
-  const leadFields = useMemo(() => {
-    if (!lead?.baraatDetails) return [];
-    
-    const leadFieldKeys = new Set(Object.keys(lead.baraatDetails));
-    return allFields.filter(field => leadFieldKeys.has(field.key));
-  }, [lead?.baraatDetails, allFields]);
-
-  // Sort fields by order
-  const sortedLeadFields = useMemo(() => {
-    return [...leadFields].sort((a, b) => a.order - b.order);
-  }, [leadFields]);
 
   // Combine events from config with event names from lead that aren't in config
   const availableEvents = useMemo(() => {
@@ -210,8 +119,6 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
       ...missingSfxNames.map(name => ({
         _id: `legacy-${name}`, // Temporary ID for legacy SFX
         name: name,
-        quantity: 1, // Default quantity
-        isActive: false,
         createdAt: '',
         updatedAt: ''
       }))
@@ -226,10 +133,10 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     [users]
   );
 
-  // Create schema based on all fields (active + inactive) and legacy fields
+  // Create schema
   const leadSchema = useMemo(() => 
-    createLeadEditSchema(allFields, legacyFields), 
-    [allFields, legacyFields]
+    createLeadEditSchema(), 
+    []
   );
 
   // Initialize form with default values
@@ -282,8 +189,11 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         status: lead.status || 'new',
         assignedTo: lead.assignedTo?._id || undefined,
         typesOfEvent: typesOfEvent.length > 0 ? typesOfEvent : undefined,
-        sfx: lead.sfx?.length > 0 ? lead.sfx.map(s => ({ name: s.name, quantity: s.quantity })) : undefined,
-        baraatDetails: lead.baraatDetails || {},
+        sfx: lead.sfx?.length > 0 ? lead.sfx.map(s => ({ name: s.name, quantity: String(s.quantity ?? '') })) : undefined,
+        baraat: lead.baraatDetails ? Object.entries(lead.baraatDetails).map(([name, quantity]) => ({ 
+          name, 
+          quantity: String(quantity ?? '') 
+        })) : undefined,
       };
     }
     return {
@@ -299,7 +209,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
       status: 'new',
       assignedTo: undefined,
       typesOfEvent: undefined,
-      baraatDetails: {},
+      baraat: undefined,
     };
   };
 
@@ -362,47 +272,18 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         numberOfGuests: event.numberOfGuests,
       }));
 
-      // Prepare SFX data
-      const sfxData = data.sfx?.filter(sfx => sfx.name && sfx.quantity > 0).map(sfx => ({
+      // Prepare SFX data - convert array to map for backend
+      const sfxData = data.sfx?.filter(sfx => sfx.name && sfx.quantity).map(sfx => ({
         name: sfx.name,
         quantity: sfx.quantity,
       }));
 
-      // Prepare baraat details - include all fields (config + legacy)
+      // Prepare baraat data - convert array to map for backend
       const baraatDetailsData: Record<string, string | number | null> = {};
-      if (data.baraatDetails) {
-        // Add all config fields
-        allFields.forEach((field) => {
-          const value = data.baraatDetails?.[field.key];
-          if (value !== undefined && value !== null && value !== '') {
-            if (field.type === 'number') {
-              const numValue = typeof value === 'number' ? value : Number(value);
-              if (!isNaN(numValue)) {
-                baraatDetailsData[field.key] = numValue;
-              }
-            } else {
-              baraatDetailsData[field.key] = String(value);
-            }
-          } else if (field.required) {
-            baraatDetailsData[field.key] = null;
-          }
-        });
-        
-        // Add legacy fields
-        legacyFields.forEach(({ key }) => {
-          const value = data.baraatDetails?.[key];
-          if (value !== undefined && value !== null && value !== '') {
-            // Try to preserve type
-            if (typeof value === 'number') {
-              baraatDetailsData[key] = value;
-            } else {
-              const numValue = Number(value);
-              if (!isNaN(numValue) && value !== '') {
-                baraatDetailsData[key] = numValue;
-              } else {
-                baraatDetailsData[key] = String(value);
-              }
-            }
+      if (data.baraat) {
+        data.baraat.forEach((item) => {
+          if (item.name && item.quantity) {
+            baraatDetailsData[item.name] = item.quantity;
           }
         });
       }
@@ -439,183 +320,8 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     }
   };
 
-  const isPending = loading || isSubmitting || baraatFieldsLoading || eventsLoading;
+  const isPending = loading || isSubmitting || baraatFieldsLoading || eventsLoading || sfxLoading;
 
-  // Render baraat field based on type
-  const renderBaraatField = (field: BaraatFieldConfig) => {
-    const fieldName = `baraatDetails.${field.key}` as const;
-    
-    switch (field.type) {
-      case 'text':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                  {!field.isActive && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
-                  )}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    {...formField}
-                    value={formField.value || ''}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'number':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                  {!field.isActive && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
-                  )}
-                </FormLabel>
-                <FormControl>
-                  <Input
-                    type="number"
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    {...formField}
-                    value={formField.value || ''}
-                    onChange={(e) => {
-                      const value = e.target.value;
-                      formField.onChange(value ? Number(value) : undefined);
-                    }}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'textarea':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                  {!field.isActive && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
-                  )}
-                </FormLabel>
-                <FormControl>
-                  <Textarea
-                    placeholder={`Enter ${field.label.toLowerCase()}`}
-                    rows={3}
-                    {...formField}
-                    value={formField.value || ''}
-                  />
-                </FormControl>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      case 'dropdown':
-        return (
-          <FormField
-            key={field._id}
-            control={form.control}
-            name={fieldName}
-            render={({ field: formField }) => (
-              <FormItem>
-                <FormLabel>
-                  {field.label} {field.required && '*'}
-                  {!field.isActive && (
-                    <span className="ml-2 text-xs text-muted-foreground">(Inactive)</span>
-                  )}
-                </FormLabel>
-                <Select
-                  onValueChange={formField.onChange}
-                  value={formField.value || ""}
-                >
-                  <FormControl>
-                    <SelectTrigger>
-                      <SelectValue placeholder={`Select ${field.label.toLowerCase()}`} />
-                    </SelectTrigger>
-                  </FormControl>
-                  <SelectContent>
-                    {field.dropdownOptions?.map((option) => (
-                      <SelectItem key={option} value={option}>
-                        {option}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-                <FormMessage />
-              </FormItem>
-            )}
-          />
-        );
-      
-      default:
-        return null;
-    }
-  };
-
-  // Render legacy field (simple text input)
-  const renderLegacyField = (legacyField: { key: string; value: any }) => {
-    const fieldName = `baraatDetails.${legacyField.key}` as const;
-    const isNumber = typeof legacyField.value === 'number';
-    
-    return (
-      <FormField
-        key={legacyField.key}
-        control={form.control}
-        name={fieldName}
-        render={({ field: formField }) => (
-          <FormItem>
-            <FormLabel className="text-amber-600 dark:text-amber-500">
-              {legacyField.key} <span className="text-xs text-muted-foreground">(Legacy)</span>
-            </FormLabel>
-            <FormControl>
-              {isNumber ? (
-                <Input
-                  type="number"
-                  placeholder={`Enter ${legacyField.key}`}
-                  {...formField}
-                  value={formField.value || ''}
-                  onChange={(e) => {
-                    const value = e.target.value;
-                    formField.onChange(value ? Number(value) : undefined);
-                  }}
-                />
-              ) : (
-                <Input
-                  placeholder={`Enter ${legacyField.key}`}
-                  {...formField}
-                  value={formField.value || ''}
-                />
-              )}
-            </FormControl>
-            <FormMessage />
-          </FormItem>
-        )}
-      />
-    );
-  };
 
   if (!lead) {
     return null;
@@ -964,7 +670,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                         ...currentSfx,
                         {
                           name: "",
-                          quantity: 1,
+                          quantity: "",
                         },
                       ]);
                     }}
@@ -1037,11 +743,9 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                             <FormLabel>Quantity *</FormLabel>
                             <FormControl>
                               <Input
-                                type="number"
+                                type="text"
                                 placeholder="Enter quantity"
-                                min="1"
                                 {...field}
-                                onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
                                 value={field.value || ""}
                                 disabled={isSubmitting || loading}
                               />
@@ -1061,34 +765,114 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                 )}
               </div>
 
-              {/* Baraat Details Section - Config Fields */}
-              {sortedLeadFields.length > 0 && (
-                <div className="space-y-4">
-                  <h3 className="text-lg font-semibold">Baraat Details</h3>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {sortedLeadFields.map((field) => renderBaraatField(field))}
-                  </div>
+              {/* Baraat Section */}
+              <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-lg font-semibold">Baraat</h3>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentBaraat = form.getValues("baraat") || [];
+                      form.setValue("baraat", [
+                        ...currentBaraat,
+                        {
+                          name: "",
+                          quantity: "",
+                        },
+                      ]);
+                    }}
+                    disabled={isSubmitting || loading || baraatFieldsLoading}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Baraat
+                  </Button>
                 </div>
-              )}
 
-              {/* Legacy Fields Section */}
-              {legacyFields.length > 0 && (
-                <div className="space-y-4">
-                  <div className="flex items-center gap-2">
-                    <h3 className="text-lg font-semibold">Legacy Fields</h3>
-                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
+                {form.watch("baraat")?.map((baraat, index) => (
+                  <Card key={index} className="p-4">
+                    <div className="flex items-start justify-between mb-4">
+                      <h4 className="font-medium text-sm">Baraat {index + 1}</h4>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentBaraat = form.getValues("baraat") || [];
+                          form.setValue(
+                            "baraat",
+                            currentBaraat.filter((_, i) => i !== index)
+                          );
+                        }}
+                        disabled={isSubmitting || loading}
+                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      {/* Baraat Name - Dropdown from Baraat Config */}
+                      <FormField
+                        control={form.control}
+                        name={`baraat.${index}.name`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Baraat Name *</FormLabel>
+                            <Select
+                              onValueChange={field.onChange}
+                              value={field.value || ""}
+                              disabled={isSubmitting || loading || baraatFieldsLoading}
+                            >
+                              <FormControl>
+                                <SelectTrigger>
+                                  <SelectValue placeholder="Select baraat" />
+                                </SelectTrigger>
+                              </FormControl>
+                              <SelectContent>
+                                {allFields.map((baraatConfig) => (
+                                  <SelectItem key={baraatConfig._id} value={baraatConfig.name}>
+                                    {baraatConfig.name}
+                                  </SelectItem>
+                                ))}
+                              </SelectContent>
+                            </Select>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      {/* Quantity */}
+                      <FormField
+                        control={form.control}
+                        name={`baraat.${index}.quantity`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Quantity *</FormLabel>
+                            <FormControl>
+                              <Input
+                                type="text"
+                                placeholder="Enter quantity"
+                                {...field}
+                                value={field.value || ""}
+                                disabled={isSubmitting || loading}
+                              />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+                    </div>
+                  </Card>
+                ))}
+
+                {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
+                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                    No baraat added. Click "Add Baraat" to add baraat details.
                   </div>
-                  <Alert className="bg-amber-50 dark:bg-amber-950 border-amber-200 dark:border-amber-800">
-                    <AlertCircle className="h-4 w-4 text-amber-600 dark:text-amber-500" />
-                    <AlertDescription className="text-sm text-amber-800 dark:text-amber-200">
-                      These fields are not in the current configuration but exist in this lead's data. You can edit them freely.
-                    </AlertDescription>
-                  </Alert>
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {legacyFields.map((legacyField) => renderLegacyField(legacyField))}
-                  </div>
-                </div>
-              )}
+                )}
+              </div>
 
               {/* Status and Assignment Section */}
               <div className={`grid ${user?.role === 'admin' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-4`}>

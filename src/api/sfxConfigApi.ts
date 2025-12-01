@@ -1,23 +1,19 @@
 import apiClient from './apiClient';
 
-// SFX Config types based on backend model
+// SFX Config types based on simplified backend model
 export interface SfxConfig {
   _id: string;
   name: string;
-  quantity: number;
-  isActive: boolean;
   createdAt: string;
   updatedAt: string;
 }
 
 export interface SfxConfigCreateData {
   name: string;
-  quantity: number;
 }
 
 export interface SfxConfigUpdateData {
   name?: string;
-  quantity?: number;
 }
 
 // SFX Config API functions
