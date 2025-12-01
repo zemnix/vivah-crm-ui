@@ -93,8 +93,6 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
       ...missingEventNames.map(name => ({
         _id: `legacy-${name}`, // Temporary ID for legacy events
         name: name,
-        description: '', // Not needed for display
-        isActive: false,
         createdAt: '',
         updatedAt: ''
       }))
