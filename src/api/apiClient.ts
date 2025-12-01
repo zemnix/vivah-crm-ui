@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://vinayak-enterprises-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AUTH_API_BASE_URL || 'http://localhost:4000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://vivah-creations-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
+// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AUTH_API_BASE_URL || 'http://localhost:4000/api/v1';
 
 // Create axios instance with interceptor for auth
 const apiClient = axios.create({
