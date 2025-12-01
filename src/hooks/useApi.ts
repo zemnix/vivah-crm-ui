@@ -22,7 +22,7 @@ const mockLeads: Lead[] = [
     email: 'sarah@abc.com',
     mobile: '+1987654321',
     source: 'Referral',
-    status: 'followup',
+    status: 'follow_up',
     createdBy: { _id: 'staff2', name: 'Bob Smith', email: 'bob@company.com', role: 'staff' },
     createdAt: '2025-08-21T14:30:00Z',
     updatedAt: '2025-08-21T14:30:00Z'
@@ -34,7 +34,7 @@ const mockLeads: Lead[] = [
     email: 'mike@wilson.com',
     mobile: '+1122334455',
     source: 'Cold Call',
-    status: 'followup',
+    status: 'follow_up',
     createdBy: { _id: 'staff1', name: 'Alice Johnson', email: 'alice@company.com', role: 'staff' },
     createdAt: '2025-08-22T09:15:00Z',
     updatedAt: '2025-08-22T09:15:00Z'
@@ -46,7 +46,7 @@ const mockLeads: Lead[] = [
     email: 'emma@global.com',
     mobile: '+1555666777',
     source: 'Website',
-    status: 'details_sent',
+    status: 'quotation_sent',
     createdBy: { _id: 'staff2', name: 'Bob Smith', email: 'bob@company.com', role: 'staff' },
     createdAt: '2025-08-23T16:45:00Z',
     updatedAt: '2025-08-23T16:45:00Z'
@@ -58,7 +58,7 @@ const mockLeads: Lead[] = [
     email: 'robert@brown.com',
     mobile: '+1888999000',
     source: 'Trade Show',
-    status: 'deal_done',
+    status: 'converted',
     createdBy: { _id: 'staff1', name: 'Alice Johnson', email: 'alice@company.com', role: 'staff' },
     createdAt: '2025-08-19T11:20:00Z',
     updatedAt: '2025-08-24T15:30:00Z'

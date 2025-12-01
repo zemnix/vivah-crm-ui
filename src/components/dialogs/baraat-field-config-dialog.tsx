@@ -4,13 +4,11 @@ import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from "@/components/ui/form";
-import { Switch } from "@/components/ui/switch";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import type { BaraatFieldConfig } from "@/api/baraatConfigApi";
 import { useEffect, useState } from "react";
-import { Loader, Plus, X } from "lucide-react";
+import { Loader } from "lucide-react";
 
 const fieldConfigSchema = z.object({
   name: z.string().min(1, "Field name is required").max(100, "Field name must be less than 100 characters"),

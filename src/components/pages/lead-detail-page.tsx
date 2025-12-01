@@ -217,27 +217,113 @@ export default function LeadDetailPage({
     }
   ].sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
 
+  // Prepare SFX details for display
+  const sfxDetailsItems = useMemo(() => {
+    if (!lead?.sfx) {
+      return [];
+    }
+
+    // Helper to safely convert quantity to string
+    const convertQuantityToString = (quantity: any): string => {
+      if (quantity === null || quantity === undefined) {
+        return '';
+      }
+      
+      // If it's already a string or number, convert directly
+      if (typeof quantity === 'string') {
+        return quantity.trim();
+      }
+      if (typeof quantity === 'number') {
+        return String(quantity);
+      }
+      
+      // If it's an object, try to extract meaningful value
+      if (typeof quantity === 'object') {
+        // Check if it has a value property (Mongoose Map might wrap it)
+        if ('value' in quantity) {
+          const value = quantity.value;
+          if (typeof value === 'string' || typeof value === 'number') {
+            return String(value);
+          }
+        }
+        // Check for common object properties that might contain the actual value
+        if ('quantity' in quantity && (typeof quantity.quantity === 'string' || typeof quantity.quantity === 'number')) {
+          return String(quantity.quantity);
+        }
+        // If it's an array with one element, use that
+        if (Array.isArray(quantity) && quantity.length > 0) {
+          return convertQuantityToString(quantity[0]);
+        }
+        // Last resort: return empty string for complex objects
+        return '';
+      }
+      
+      return String(quantity);
+    };
+
+    // Convert SFX from Map/object to array format
+    let sfxEntries: Array<{ name: string; quantity: string }> = [];
+    
+    if (Array.isArray(lead.sfx)) {
+      // If it's already an array (legacy format), use it directly
+      sfxEntries = lead.sfx.map(s => ({
+        name: s.name || '',
+        quantity: convertQuantityToString(s.quantity)
+      }));
+    } else if (typeof lead.sfx === 'object' && lead.sfx !== null) {
+      // If it's an object/Map, convert it to array
+      // Handle both regular objects and Mongoose Map-like structures
+      let entries: Array<[string, any]> = [];
+      
+      // Check if it's a Map instance (in browser environment)
+      // Use type assertion since lead.sfx can be array or object at runtime
+      const sfxValue = lead.sfx as any;
+      if (sfxValue instanceof Map) {
+        entries = Array.from(sfxValue.entries()) as Array<[string, any]>;
+      } else {
+        // It's a plain object
+        entries = Object.entries(sfxValue) as Array<[string, any]>;
+      }
+      
+      sfxEntries = entries
+        .filter((entry): entry is [string, any] => {
+          const [name] = entry;
+          return Boolean(name && name !== 'null' && name !== 'undefined' && name !== '__v');
+        })
+        .map(([name, quantity]) => ({
+          name: String(name),
+          quantity: convertQuantityToString(quantity)
+        }));
+    }
+
+    return sfxEntries.filter(item => item.name && item.quantity);
+  }, [lead?.sfx]);
+
   // Prepare baraat details for display
   const baraatDetailsItems = useMemo(() => {
     if (!lead?.baraatDetails || Object.keys(lead.baraatDetails).length === 0) {
       return [];
     }
 
-    // Create a map of field keys to field configs for quick lookup
-    const fieldMap = new Map(activeFields.map(field => [field.key, field]));
+    // Create a map of field names to field configs for quick lookup
+    const fieldMap = new Map(activeFields.map(field => [field.name, field]));
     
-    // Get all keys from baraatDetails and sort by field order
+    // Get all keys from baraatDetails and sort by field name
     const detailKeys = Object.keys(lead.baraatDetails);
-    const sortedKeys = detailKeys
-      .map(key => {
-        const field = fieldMap.get(key);
-        return { key, field, order: field?.order ?? 999 };
-      })
-      .sort((a, b) => a.order - b.order);
+    const sortedKeys = detailKeys.sort((a, b) => {
+      const fieldA = fieldMap.get(a);
+      const fieldB = fieldMap.get(b);
+      // Sort by field name if both exist in config, otherwise by key name
+      if (fieldA && fieldB) {
+        return fieldA.name.localeCompare(fieldB.name);
+      }
+      return a.localeCompare(b);
+    });
 
-    return sortedKeys.map(({ key, field }) => {
+    return sortedKeys.map((key) => {
       const value = lead.baraatDetails?.[key];
-      const label = field?.label || key;
+      const field = fieldMap.get(key);
+      const label = field?.name || key;
       const displayValue = value !== null && value !== undefined && value !== '' 
         ? String(value) 
         : 'Not provided';
@@ -539,14 +625,14 @@ export default function LeadDetailPage({
             )}
 
             {/* SFX Information */}
-            {lead.sfx && lead.sfx.length > 0 && (
+            {sfxDetailsItems.length > 0 && (
               <Card>
                 <CardHeader>
                   <CardTitle>SFX Details</CardTitle>
                 </CardHeader>
                 <CardContent>
                   <div className="space-y-4">
-                    {lead.sfx.map((sfxItem, index) => (
+                    {sfxDetailsItems.map((sfxItem, index) => (
                       <div
                         key={index}
                         className="p-4 border rounded-lg bg-muted/30 space-y-2"
@@ -554,7 +640,7 @@ export default function LeadDetailPage({
                         <div className="flex items-center justify-between">
                           <h4 className="font-semibold text-foreground">{sfxItem.name}</h4>
                           <Badge variant="secondary" className="text-xs">
-                            Quantity: {sfxItem.quantity}
+                            {sfxItem.quantity}
                           </Badge>
                         </div>
                       </div>

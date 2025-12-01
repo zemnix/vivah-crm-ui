@@ -363,11 +363,10 @@ export const useLeadStore = create<LeadStore>()(
         const lowercaseQuery = query.toLowerCase();
         
         return leads.filter((lead) =>
-          lead.name.toLowerCase().includes(lowercaseQuery) ||
-          lead.email?.toLowerCase().includes(lowercaseQuery) ||
-          lead.mobile?.includes(query) ||
-          lead.location?.toLowerCase().includes(lowercaseQuery) ||
-          lead.machineName?.toLowerCase().includes(lowercaseQuery)
+          lead.customer?.name?.toLowerCase().includes(lowercaseQuery) ||
+          lead.customer?.email?.toLowerCase().includes(lowercaseQuery) ||
+          lead.customer?.mobile?.includes(query) ||
+          lead.customer?.address?.toLowerCase().includes(lowercaseQuery)
         );
       },
 

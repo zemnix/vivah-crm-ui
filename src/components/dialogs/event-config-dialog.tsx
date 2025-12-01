@@ -5,7 +5,6 @@ import { z } from "zod";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
 import { useEventConfigStore } from "@/store/eventConfigStore";
 import type { EventConfig, EventConfigCreateData, EventConfigUpdateData } from "@/api/eventConfigApi";
@@ -89,25 +88,6 @@ export function EventConfigDialog({ open, onOpenChange, event, mode }: EventConf
                   <FormControl>
                     <Input
                       placeholder="Enter event name"
-                      {...field}
-                      disabled={isSubmitting || loading}
-                    />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
-
-            <FormField
-              control={form.control}
-              name="description"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Description *</FormLabel>
-                  <FormControl>
-                    <Textarea
-                      placeholder="Enter event description"
-                      rows={4}
                       {...field}
                       disabled={isSubmitting || loading}
                     />

@@ -53,10 +53,7 @@ export interface ConvertEnquiryToLeadData {
     dayNight: 'day' | 'night' | 'both';
     numberOfGuests: number;
   }>;
-  sfx?: Array<{
-    name: string;
-    quantity: string;
-  }>;
+  sfx?: Record<string, string | number | null>;
   baraatDetails?: Record<string, string | number | null>;
 }
 

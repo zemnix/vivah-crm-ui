@@ -153,7 +153,7 @@ export const useBaraatConfigStore = create<BaraatConfigStore>()(
         }
       },
 
-      deleteField: async (fieldId, hardDelete = false) => {
+      deleteField: async (fieldId, _hardDelete = false) => {
         set({ loading: true, error: null });
         try {
           await deleteBaraatFieldConfigApi(fieldId, true);

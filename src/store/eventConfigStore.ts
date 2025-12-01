@@ -147,7 +147,7 @@ export const useEventConfigStore = create<EventConfigStore>()(
         }
       },
 
-      deleteEvent: async (eventId, hardDelete = false) => {
+      deleteEvent: async (eventId, _hardDelete = false) => {
         set({ loading: true, error: null });
         try {
           // Backend now always hard-deletes events; ignore hardDelete flag

@@ -135,10 +135,14 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
     
     try {
       // Prepare SFX data - convert array to map for backend
-      const sfxData = data.sfx?.filter(sfx => sfx.name && sfx.quantity).map(sfx => ({
-        name: sfx.name,
-        quantity: sfx.quantity,
-      }));
+      const sfxData: Record<string, string | number | null> = {};
+      if (data.sfx) {
+        data.sfx.forEach((item) => {
+          if (item.name && item.quantity) {
+            sfxData[item.name] = item.quantity;
+          }
+        });
+      }
 
       // Prepare baraat data - convert array to map for backend
       const baraatDetailsData: Record<string, string | number | null> = {};
@@ -160,7 +164,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
           dayNight: event.dayNight,
           numberOfGuests: event.numberOfGuests, // Backend will use enquiry's value, but we send it for matching
         })),
-        sfx: sfxData && sfxData.length > 0 ? sfxData : undefined,
+        sfx: Object.keys(sfxData).length > 0 ? sfxData : undefined,
         baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
       };
 
@@ -279,7 +283,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                 </div>
               </div>
 
-              {typesOfEvent.map((event, index) => (
+              {typesOfEvent.map((_event, index) => (
                 <div key={index} className="p-4 border rounded-lg bg-muted/30">
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {/* Event Name - Read-only from enquiry */}
@@ -406,7 +410,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                 </Button>
               </div>
 
-              {form.watch("sfx")?.map((sfx, index) => (
+              {form.watch("sfx")?.map((_sfx, index) => (
                 <Card key={index} className="p-4">
                   <div className="flex items-start justify-between mb-4">
                     <h4 className="font-medium text-sm">SFX {index + 1}</h4>
@@ -515,7 +519,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                 </Button>
               </div>
 
-              {form.watch("baraat")?.map((baraat, index) => (
+              {form.watch("baraat")?.map((_baraat, index) => (
                 <Card key={index} className="p-4">
                   <div className="flex items-start justify-between mb-4">
                     <h4 className="font-medium text-sm">Baraat {index + 1}</h4>

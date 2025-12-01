@@ -7,9 +7,8 @@ import { DataTable } from "@/components/ui/data-table";
 import { useEnquiryStore } from "@/store/enquiryStore";
 import type { Enquiry, EnquiryQueryParams } from "@/api/enquiryApi";
 import { Badge } from "@/components/ui/badge";
-import { Plus, Edit, Trash2, MoreHorizontal, Search, X, Filter, ArrowRight } from "lucide-react";
+import { Plus, Edit, Trash2, MoreHorizontal, Search, Filter, ArrowRight } from "lucide-react";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
-import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { EnquiryDialog } from "@/components/dialogs/enquiry-dialog";
@@ -66,7 +65,6 @@ export default function EnquiriesPage({
     clearError,
   } = useEnquiryStore();
 
-  const navigate = useNavigate();
   const { toast } = useToast();
 
   // Fetch enquiries on component mount and when filters change
@@ -220,7 +218,7 @@ export default function EnquiriesPage({
     {
       key: 'customer.name',
       header: 'Customer Name',
-      render: (value: string, enquiry: Enquiry) => (
+      render: (_value: string, enquiry: Enquiry) => (
         <div className="font-medium">{enquiry.customer?.name || 'N/A'}</div>
       ),
       sortable: true,
@@ -228,21 +226,21 @@ export default function EnquiriesPage({
     {
       key: 'customer.mobile',
       header: 'Mobile',
-      render: (value: string, enquiry: Enquiry) => (
+      render: (_value: string, enquiry: Enquiry) => (
         <span className="font-mono text-sm">{enquiry.customer?.mobile || 'N/A'}</span>
       ),
     },
     {
       key: 'customer.email',
       header: 'Email',
-      render: (value: string, enquiry: Enquiry) => (
+      render: (_value: string, enquiry: Enquiry) => (
         <span className="text-sm">{enquiry.customer?.email || 'N/A'}</span>
       ),
     },
     {
       key: 'typesOfEvent',
       header: 'Events',
-      render: (value: any, enquiry: Enquiry) => (
+      render: (_value: any, enquiry: Enquiry) => (
         <div className="flex flex-wrap gap-1">
           {enquiry.typesOfEvent?.map((event, idx) => (
             <Badge key={idx} variant="secondary" className="text-xs">
@@ -434,21 +432,21 @@ export default function EnquiriesPage({
             <DataTable
               data={enquiries}
               columns={columns}
-              searchKey="customer.name"
+              searchKey={undefined}
               searchPlaceholder="Search enquiries..."
               actions={actions}
               isLoading={loading}
-              pagination={pagination ? {
-                currentPage: pagination.currentPage,
-                totalPages: pagination.totalPages,
-                totalItems: pagination.totalItems,
-                itemsPerPage: pagination.itemsPerPage,
-                onPageChange: (page: number) => setCurrentPage(page),
-                onPageSizeChange: (size: number) => {
-                  setPageSize(size);
-                  setCurrentPage(1);
-                },
-              } : undefined}
+              serverSide={!!pagination}
+              currentPage={pagination?.currentPage}
+              totalPages={pagination?.totalPages}
+              totalItems={pagination?.totalItems}
+              pageSize={pagination?.itemsPerPage}
+              onPageChange={(page: number) => setCurrentPage(page)}
+              onPageSizeChange={(size: number) => {
+                setPageSize(size);
+                setCurrentPage(1);
+              }}
+              showPageSizeSelector={!!pagination}
               emptyMessage="No enquiries found. Create your first enquiry to get started."
             />
           </CardContent>

@@ -7,7 +7,6 @@ import { Textarea } from "@/components/ui/textarea";
 import { SearchableLeadSelect } from "@/components/ui/searchable-lead-select";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { Label } from "@/components/ui/label";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { useAuthStore } from "@/store/authStore";
 import { useQuotationStore } from "@/store/quotationStore";
 import { useToast } from "@/hooks/use-toast";
@@ -134,18 +133,13 @@ export default function NewQuotationPage({
     try {
       const lead = await getLeadByIdApi(leadId);
       
-      // Format address as: location, district, state, pinCode
-      const addressParts = [];
-      if (lead.location) addressParts.push(lead.location);
-      if (lead.district) addressParts.push(lead.district);
-      if (lead.state) addressParts.push(lead.state);
-      if (lead.pinCode) addressParts.push(lead.pinCode.toString());
-      const formattedAddress = addressParts.join(', ') || '';
+      // Use customer address from lead
+      const formattedAddress = lead.customer?.address || '';
       
       // Populate customer fields with lead data
-      form.setValue('customer.name', lead.name || '');
-      form.setValue('customer.email', lead.email || '');
-      form.setValue('customer.mobile', lead.mobile || '');
+      form.setValue('customer.name', lead.customer?.name || '');
+      form.setValue('customer.email', lead.customer?.email || '');
+      form.setValue('customer.mobile', lead.customer?.mobile || '');
       form.setValue('customer.address', formattedAddress);
       form.setValue('customer.gst', '');
       

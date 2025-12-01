@@ -60,7 +60,7 @@ export type LeadStatus =
 export interface LeadCreateData {
   customer: Customer;
   typesOfEvent?: TypeOfEvent[];
-  sfx?: Sfx[];
+  sfx?: Record<string, string | number | null>;
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   assignedTo?: string;
@@ -69,7 +69,7 @@ export interface LeadCreateData {
 export interface LeadUpdateData {
   customer?: Partial<Customer>;
   typesOfEvent?: TypeOfEvent[];
-  sfx?: Sfx[];
+  sfx?: Record<string, string | number | null>;
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   assignedTo?: string;

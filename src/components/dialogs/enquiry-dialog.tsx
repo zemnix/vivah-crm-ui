@@ -314,7 +314,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
                 </Button>
               </div>
 
-              {typesOfEvent.map((event, index) => (
+              {typesOfEvent.map((_event, index) => (
                 <Card key={index} className="p-4">
                   <div className="flex items-start justify-between mb-4">
                     <h4 className="font-medium text-sm">Event {index + 1}</h4>

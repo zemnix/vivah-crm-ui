@@ -147,7 +147,7 @@ export const useSfxConfigStore = create<SfxConfigStore>()(
         }
       },
 
-      deleteSfx: async (sfxId, hardDelete = false) => {
+      deleteSfx: async (sfxId, _hardDelete = false) => {
         set({ loading: true, error: null });
         try {
           // Backend now always hard-deletes SFX configs; ignore hardDelete flag

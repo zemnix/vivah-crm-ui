@@ -12,7 +12,7 @@ export default function AdminReports() {
   const { data: leads, isLoading: leadsLoading } = useLeads();
 
   const totalLeads = leads?.length || 0;
-  const wonLeads = leads?.filter(lead => lead.status === 'deal_done').length || 0;
+  const wonLeads = leads?.filter(lead => lead.status === 'converted').length || 0;
   const conversionRate = totalLeads > 0 ? ((wonLeads / totalLeads) * 100).toFixed(1) : '0';
 
   return (
@@ -160,9 +160,9 @@ export default function AdminReports() {
             <div className="space-y-4">
               {[
                 { stage: 'New Leads', count: leads?.filter(l => l.status === 'new').length || 0, percentage: 100 },
-                { stage: 'In Follow-up', count: leads?.filter(l => l.status === 'followup').length || 0, percentage: 75 },
-                { stage: 'Meeting Scheduled', count: leads?.filter(l => l.status === 'followup').length || 0, percentage: 50 },
-                { stage: 'Details Sent', count: leads?.filter(l => l.status === 'details_sent').length || 0, percentage: 30 },
+                { stage: 'In Follow-up', count: leads?.filter(l => l.status === 'follow_up').length || 0, percentage: 75 },
+                { stage: 'Meeting Scheduled', count: leads?.filter(l => l.status === 'follow_up').length || 0, percentage: 50 },
+                { stage: 'Details Sent', count: leads?.filter(l => l.status === 'quotation_sent').length || 0, percentage: 30 },
                 { stage: 'Won', count: wonLeads, percentage: 15 },
               ].map((stage) => (
                 <div key={stage.stage} className="flex items-center gap-4">

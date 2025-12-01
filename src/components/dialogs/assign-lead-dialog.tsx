@@ -111,7 +111,7 @@ export function AssignLeadDialog({
         <DialogHeader>
           <DialogTitle>Assign Lead</DialogTitle>
           <DialogDescription>
-            Assign "{lead.name}" to a staff member or unassign them.
+            Assign "{lead.customer.name}" to a staff member or unassign them.
           </DialogDescription>
         </DialogHeader>
 

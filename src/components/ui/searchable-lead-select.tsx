@@ -32,9 +32,9 @@ export function SearchableLeadSelect({
   const dropdownRef = useRef<HTMLDivElement>(null);
 
   const formatLeadDisplay = useCallback((lead: Lead) => {
-    const parts = [lead.name];
-    if (lead.location) parts.push(lead.location);
-    if (lead.mobile) parts.push(lead.mobile);
+    const parts = [lead.customer?.name || 'N/A'];
+    if (lead.customer?.address) parts.push(lead.customer.address);
+    if (lead.customer?.mobile) parts.push(lead.customer.mobile);
     return parts.join(' • ');
   }, []);
 
@@ -223,14 +223,14 @@ export function SearchableLeadSelect({
                 >
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-sm truncate">
-                      {lead.name}
+                      {lead.customer?.name || 'N/A'}
                     </div>
                     <div className="text-xs text-muted-foreground flex items-center gap-2">
-                      {lead.location && (
-                        <span className="truncate">{lead.location}</span>
+                      {lead.customer?.address && (
+                        <span className="truncate">{lead.customer.address}</span>
                       )}
-                      {lead.mobile && (
-                        <span className="font-mono">{lead.mobile}</span>
+                      {lead.customer?.mobile && (
+                        <span className="font-mono">{lead.customer.mobile}</span>
                       )}
                     </div>
                   </div>
