@@ -10,6 +10,7 @@ import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useDashboard } from '@/hooks/useDashboard';
 import { DashboardFilters, dashboardApi, Staff } from '@/api/dashboardApi';
+import { EventsCalendar } from '@/components/events-calendar';
 import {
   XAxis,
   YAxis,
@@ -344,6 +345,9 @@ export default function AdminDashboard() {
             </Button>
           </div>
         </div>
+
+        {/* Events Calendar */}
+        <EventsCalendar />
 
         {/* Filters */}
         <Card className="mb-6">

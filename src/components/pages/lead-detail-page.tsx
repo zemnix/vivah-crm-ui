@@ -22,6 +22,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
+import { ClientProgressionTable } from "@/components/client-progression-table";
 
 interface LeadDetailPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -89,22 +90,24 @@ export default function LeadDetailPage({
   }, [fetchActiveFields]);
 
 
+  // Function to fetch activities
+  const fetchActivities = async () => {
+    if (lead?._id) {
+      setActivitiesLoading(true);
+      try {
+        const activityData = await getLeadActivitiesApi(lead._id);
+        setActivities(activityData || []);
+      } catch (error) {
+        console.error('Failed to fetch activities:', error);
+        setActivities([]);
+      } finally {
+        setActivitiesLoading(false);
+      }
+    }
+  };
+
   // Fetch activities when lead is loaded
   useEffect(() => {
-    const fetchActivities = async () => {
-      if (lead?._id) {
-        setActivitiesLoading(true);
-        try {
-          const activityData = await getLeadActivitiesApi(lead._id);
-          setActivities(activityData);
-        } catch (error) {
-          console.error('Failed to fetch activities:', error);
-        } finally {
-          setActivitiesLoading(false);
-        }
-      }
-    };
-
     fetchActivities();
   }, [lead?._id]);
 
@@ -118,11 +121,15 @@ export default function LeadDetailPage({
         title: "Success",
         description: `Lead status updated to ${newStatus.replace('_', ' ')}`,
       });
+      // Refresh activities after status change
+      await fetchActivities();
     } else {
       let message = optError;
       if (!message) {
         try {
           await updateLeadApi(lead._id, { status: newStatus });
+          // Refresh activities after status change
+          await fetchActivities();
         } catch (e) {
           message = e instanceof Error ? e.message : 'Failed to update lead status';
         }
@@ -181,9 +188,13 @@ export default function LeadDetailPage({
 
 
   // Map activity types to timeline types
-  const mapActivityToTimelineType = (activityType: Activity['type']): 'call' | 'meeting' | 'note' | 'status' | 'quotation' => {
-    switch (activityType) {
+  const mapActivityToTimelineType = (activity: Activity): 'call' | 'meeting' | 'note' | 'status' | 'quotation' => {
+    switch (activity.type) {
       case 'interaction':
+        // Check meta.interactionType to determine if it's a call or meeting
+        if (activity.meta?.interactionType === 'meeting') {
+          return 'meeting';
+        }
         return 'call';
       case 'quotation':
         return 'quotation';
@@ -198,14 +209,36 @@ export default function LeadDetailPage({
 
   // Create timeline items from activities
   const timelineItems = [
-    ...activities.map(activity => ({
-      id: activity._id,
-      title: getActivityTypeLabel(activity.type),
-      description: activity.description || `${getActivityTypeLabel(activity.type)} activity`,
-      timestamp: new Date(activity.createdAt),
-      type: mapActivityToTimelineType(activity.type),
-      user: activity.userId?.name
-    })),
+    ...activities.map(activity => {
+      // Build a better description based on activity type and meta
+      let description = activity.description || '';
+      if (activity.type === 'interaction' && activity.meta) {
+        const interactionType = activity.meta.interactionType || 'interaction';
+        const interactionStatus = activity.meta.interactionStatus || '';
+        const date = activity.meta.date ? new Date(activity.meta.date).toLocaleString() : '';
+        description = `${interactionType === 'call' ? 'Call' : 'Meeting'} ${interactionStatus}${date ? ` on ${date}` : ''}`;
+        if (activity.meta.remarks) {
+          description += ` - ${activity.meta.remarks}`;
+        }
+      } else if (activity.type === 'status_change' && activity.meta) {
+        const oldStatus = activity.meta.oldStatus;
+        const newStatus = activity.meta.newStatus;
+        if (oldStatus && newStatus) {
+          description = `Status changed from ${oldStatus.replace('_', ' ')} to ${newStatus.replace('_', ' ')}`;
+        } else if (newStatus) {
+          description = `Status set to ${newStatus.replace('_', ' ')}`;
+        }
+      }
+
+      return {
+        id: activity._id,
+        title: getActivityTypeLabel(activity.type),
+        description: description || `${getActivityTypeLabel(activity.type)} activity`,
+        timestamp: new Date(activity.createdAt),
+        type: mapActivityToTimelineType(activity),
+        user: activity.userId?.name
+      };
+    }),
     // Lead assignment item
     {
       id: 'assigned',
@@ -443,6 +476,10 @@ export default function LeadDetailPage({
                   <DropdownMenuItem onClick={handleAssign}>
                     Assign to Staff
                   </DropdownMenuItem>
+                  <DropdownMenuItem onClick={handleScheduleInteraction}>
+                    <Plus className="mr-2 h-4 w-4" />
+                    Schedule Call & Meeting
+                  </DropdownMenuItem>
                   <DropdownMenuSeparator />
                   <DropdownMenuItem
                     onClick={handleDelete}
@@ -668,6 +705,11 @@ export default function LeadDetailPage({
                 </CardContent>
               </Card>
             )}
+
+            {/* Client Progression - Only for converted leads */}
+            {lead?.status === 'converted' && (
+              <ClientProgressionTable lead={lead} />
+            )}
           </div>
 
           {/* Activity Timeline */}
@@ -701,7 +743,13 @@ export default function LeadDetailPage({
 
         <InteractionDialog
           open={interactionDialogOpen}
-          onOpenChange={setInteractionDialogOpen}
+          onOpenChange={(open) => {
+            setInteractionDialogOpen(open);
+            // Refresh activities when dialog closes (after interaction is created)
+            if (!open) {
+              fetchActivities();
+            }
+          }}
           defaultLeadId={lead._id}
         />
 

@@ -70,7 +70,7 @@ const FilterBar = ({
   handleDateFromChange: (date: string) => void;
   handleDateToChange: (date: string) => void;
   handleStaffChange: (staffId: string) => void;
-  }) => (
+}) => (
   <div className="bg-card border border-border rounded-lg shadow-sm mb-4">
     {/* Filter Header */}
     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 pb-2 gap-2">
@@ -134,10 +134,10 @@ const FilterBar = ({
                   />
                   <label
                     htmlFor={`type-${type.value}`}
-                      className={`text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap ${selectedTypes.includes(type.value)
-                        ? 'text-red-600 font-medium'
-                        : 'text-muted-foreground'
-                        }`}
+                    className={`text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap ${selectedTypes.includes(type.value)
+                      ? 'text-red-600 font-medium'
+                      : 'text-muted-foreground'
+                      }`}
                   >
                     {type.label}
                   </label>
@@ -162,10 +162,10 @@ const FilterBar = ({
                   />
                   <label
                     htmlFor={`status-${status.value}`}
-                      className={`text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap ${selectedStatuses.includes(status.value)
-                        ? 'text-red-600 font-medium'
-                        : 'text-muted-foreground'
-                        }`}
+                    className={`text-xs text-muted-foreground cursor-pointer select-none whitespace-nowrap ${selectedStatuses.includes(status.value)
+                      ? 'text-red-600 font-medium'
+                      : 'text-muted-foreground'
+                      }`}
                   >
                     {status.label}
                   </label>
@@ -674,7 +674,7 @@ export default function InteractionsPage({
               {pageDescription}
             </p>
           </div>
-          
+
           {/* Search and Schedule - Mobile Stack */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 sm:gap-4 w-full sm:w-auto">
             <div className="relative flex-1 sm:max-w-sm">
@@ -696,15 +696,15 @@ export default function InteractionsPage({
                 </button>
               )}
             </div>
-            {
-              userRole === 'staff' && (
-                <Button onClick={handleScheduleInteraction} className="h-9 sm:h-10 w-full sm:w-auto">
-                  <Plus className="mr-2 h-4 w-4" />
-                  <span className="hidden sm:inline">Schedule Call & Meeting</span>
-                  <span className="sm:hidden">Schedule</span>
-                </Button>
-              )
-            }
+
+            {(userRole === 'staff' || userRole === 'admin') && (
+              <Button onClick={handleScheduleInteraction} className="h-9 sm:h-10 w-full sm:w-auto">
+                <Plus className="mr-2 h-4 w-4" />
+                <span className="hidden sm:inline">Schedule Call & Meeting</span>
+                <span className="sm:hidden">Schedule</span>
+              </Button>
+            )}
+
           </div>
         </div>
 

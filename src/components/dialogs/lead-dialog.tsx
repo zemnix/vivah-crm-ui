@@ -35,6 +35,7 @@ const createLeadSchema = () => {
   return z.object({
     customer: customerSchema,
     status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const),
+    source: z.enum(['others', 'reference'] as const).optional(),
     assignedTo: z.string().optional(),
     typesOfEvent: z.array(
       z.object({
@@ -158,6 +159,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           venueEmail: lead.customer?.venueEmail || "",
         },
         status: lead.status || 'new',
+        source: lead.source || 'others',
         assignedTo: lead.assignedTo?._id || undefined,
         typesOfEvent: typesOfEvent.length > 0 ? typesOfEvent : undefined,
         sfx: sfxArray.length > 0 ? sfxArray : undefined,
@@ -178,6 +180,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         venueEmail: "",
       },
       status: 'new',
+      source: 'others',
       assignedTo: undefined,
       typesOfEvent: undefined,
       baraat: undefined,
@@ -269,6 +272,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           sfx: Object.keys(sfxData).length > 0 ? sfxData : undefined,
           baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
           status: data.status,
+          source: data.source || 'others',
           ...(user.role === 'staff' 
             ? { assignedTo: user.id } 
             : data.assignedTo && { assignedTo: data.assignedTo }
@@ -290,6 +294,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           sfx: Object.keys(sfxData).length > 0 ? sfxData : undefined,
           baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
           status: data.status,
+          source: data.source || 'others',
           ...(user.role === 'staff' 
             ? {} 
             : data.assignedTo !== undefined && { assignedTo: data.assignedTo }
@@ -866,7 +871,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               </div>
 
               {/* Status and Assignment Section */}
-              <div className={`grid ${user?.role === 'admin' ? 'grid-cols-1 sm:grid-cols-2' : 'grid-cols-1'} gap-4`}>
+              <div className={`grid ${user?.role === 'admin' ? 'grid-cols-1 sm:grid-cols-3' : 'grid-cols-1 sm:grid-cols-2'} gap-4`}>
                 <FormField
                   control={form.control}
                   name="status"
@@ -885,6 +890,28 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                             <SelectItem value="quotation_sent">Quotation Sent</SelectItem>
                             <SelectItem value="converted">Converted</SelectItem>
                             <SelectItem value="lost">Lost</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="source"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Source</FormLabel>
+                      <FormControl>
+                        <Select onValueChange={field.onChange} value={field.value || 'others'}>
+                          <SelectTrigger>
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="others">Others</SelectItem>
+                            <SelectItem value="reference">Reference</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>

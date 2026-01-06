@@ -1,7 +1,21 @@
 import axios from 'axios';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'https://vivah-creations-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
-// const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || import.meta.env.VITE_AUTH_API_BASE_URL || 'http://localhost:4000/api/v1';
+const DEV_DEFAULT_API_BASE_URL = 'http://localhost:8000/api/v1';
+const PROD_DEFAULT_API_BASE_URL =
+  'https://vivah-creations-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
+
+// In dev, prefer local backend. Some environments inject VITE_API_BASE_URL globally (often pointing to prod),
+// which breaks new local-only endpoints during development. If you truly want to hit a remote API in dev,
+// set VITE_USE_REMOTE_API=true.
+const envBaseUrl: string | undefined = import.meta.env.VITE_API_BASE_URL;
+const useRemoteInDev = String(import.meta.env.VITE_USE_REMOTE_API || '').toLowerCase() === 'true';
+
+const DEFAULT_API_BASE_URL = import.meta.env.DEV ? DEV_DEFAULT_API_BASE_URL : PROD_DEFAULT_API_BASE_URL;
+
+const API_BASE_URL =
+  import.meta.env.DEV && !useRemoteInDev
+    ? DEV_DEFAULT_API_BASE_URL
+    : (envBaseUrl || DEFAULT_API_BASE_URL);
 
 // Create axios instance with interceptor for auth
 const apiClient = axios.create({

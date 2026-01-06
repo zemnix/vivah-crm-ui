@@ -6,7 +6,7 @@ import type { AuthUser } from "@/api/authApi";
 import { useTheme } from "@/providers/theme-provider";
 import { Menu, Moon, Sun, ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
-import { cn } from "@/lib/utils";
+
 
 interface HeaderProps {
   readonly onMenuClick: () => void;
@@ -42,14 +42,11 @@ export function Header({ onMenuClick, user }: HeaderProps) {
         </Button>
 
         {/* Logo */}
-        <div className={cn(
-          "flex items-center flex-shrink-0 rounded-md p-1.5",
-          // theme === 'light' ? "bg-gray-900" : ""
-        )}>
+        <div className="flex items-center flex-shrink-0">
           <img
             src="/vivahlogo.jpg"
             alt="Vivah"
-            className="h-8 sm:h-10 w-auto object-contain"
+            className="h-9 sm:h-10 object-contain pl-13 select-none opacity-90 hover:opacity-100 transition-opacity"
           />
         </div>
       </div>

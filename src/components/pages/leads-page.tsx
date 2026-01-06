@@ -720,26 +720,24 @@ export default function LeadsPage({
         </Tooltip>
       </TooltipProvider>
 
-      {userRole !== 'admin' &&
-        <TooltipProvider>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={() => handleMeeting(lead)}
-                className="text-blue-600 hover:text-blue-700"
-                data-testid={`meeting-lead-${lead._id}`}
-              >
-                <CalendarIcon className="h-4 w-4" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>
-              <p>Call & Meeting</p>
-            </TooltipContent>
-          </Tooltip>
-        </TooltipProvider>
-      }
+      <TooltipProvider>
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => handleMeeting(lead)}
+              className="text-blue-600 hover:text-blue-700"
+              data-testid={`meeting-lead-${lead._id}`}
+            >
+              <CalendarIcon className="h-4 w-4" />
+            </Button>
+          </TooltipTrigger>
+          <TooltipContent>
+            <p>Call & Meeting</p>
+          </TooltipContent>
+        </Tooltip>
+      </TooltipProvider>
 
       <TooltipProvider>
         <Tooltip>
