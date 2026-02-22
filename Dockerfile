@@ -25,7 +25,7 @@ CMD ["serve", "-s", "dist", "-l", "8080"]
 # --- Deployment commands (for reference) ---
 
 # Build the image and push to Google Container Registry (GCR)
-# gcloud builds submit --tag gcr.io/quixotic-strand-476615-s0/vivah-creations-crm-ui
+# gcloud builds submit --tag gcr.io/quixotic-strand-476615-s0/vivah-EVENTS-crm-ui
 
 # Deploy to Cloud Run
-# gcloud run deploy vivah-creations-crm-ui --image gcr.io/quixotic-strand-476615-s0/vivah-creations-crm-ui --platform managed --region asia-southeast1 --allow-unauthenticated
+# gcloud run deploy vivah-EVENTS-crm-ui --image gcr.io/quixotic-strand-476615-s0/vivah-EVENTS-crm-ui --platform managed --region asia-southeast1 --allow-unauthenticated

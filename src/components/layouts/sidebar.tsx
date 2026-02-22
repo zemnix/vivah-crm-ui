@@ -33,10 +33,10 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/leads", icon: Users, label: "Leads" },
     { href: "/admin/converted-leads", icon: Users, label: "Converted Leads" },
-    { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
+    // { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/admin/interactions", icon: MessageSquare, label: "Calls & Meetings" },
-    { href: "/admin/quotations", icon: FileText, label: "Quotations" },
-    { href: "/admin/master-config", icon: Settings, label: "Master Config" },
+    // { href: "/admin/quotations", icon: FileText, label: "Quotations" },
+    // { href: "/admin/master-config", icon: Settings, label: "Master Config" },
     // { href: "/admin/staff", icon: UserCheck, label: "Staff" },
     // { href: "/admin/reports", icon: BarChart3, label: "Reports" },
   ];
@@ -70,7 +70,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
         )}>
           <img
             src="/vinayak_enterprise_logo.jpeg"
-            alt="Vivah Creations"
+            alt="COMRADE FESTIVITY"
             className="h-8 w-auto object-contain"
           />
         </div>

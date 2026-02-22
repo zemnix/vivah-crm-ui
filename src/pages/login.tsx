@@ -81,7 +81,7 @@ export default function LoginPage() {
         <Card className="shadow-lg border border-border">
           <CardContent className="pt-8 pb-8 px-8">
             <div className="text-center mb-8">
-              <h1 className="text-3xl font-bold text-foreground">Vivah Creations</h1>
+              <h1 className="text-3xl font-bold text-foreground">COMRADE FESTIVITY</h1>
               <p className="text-muted-foreground mt-2">Sign in to your account</p>
             </div>
 

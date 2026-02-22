@@ -61,7 +61,7 @@ function App() {
           v7_relativeSplatPath: true,
         }}
       >
-        <ThemeProvider>
+        <ThemeProvider defaultTheme="light">
         <TooltipProvider>
         <Toaster />
         <Routes>

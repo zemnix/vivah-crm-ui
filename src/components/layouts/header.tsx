@@ -41,13 +41,11 @@ export function Header({ onMenuClick, user }: HeaderProps) {
           <Menu className="h-4 w-4" />
         </Button>
 
-        {/* Logo */}
+        {/* Brand */}
         <div className="flex items-center flex-shrink-0">
-          <img
-            src="/vivahlogo.jpg"
-            alt="Vivah"
-            className="h-9 sm:h-10 object-contain pl-13 select-none opacity-90 hover:opacity-100 transition-opacity"
-          />
+          <span className="text-sm sm:text-base font-semibold tracking-[0.35em] text-foreground">
+            COMRADE FESTIVITY
+          </span>
         </div>
       </div>
 

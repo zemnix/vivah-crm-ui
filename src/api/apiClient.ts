@@ -2,7 +2,7 @@ import axios from 'axios';
 
 const DEV_DEFAULT_API_BASE_URL = 'http://localhost:8000/api/v1';
 const PROD_DEFAULT_API_BASE_URL =
-  'https://vivah-creations-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
+  'https://vivah-EVENTS-crm-backend-6702538897.asia-southeast1.run.app/api/v1';
 
 // In dev, prefer local backend. Some environments inject VITE_API_BASE_URL globally (often pointing to prod),
 // which breaks new local-only endpoints during development. If you truly want to hit a remote API in dev,
