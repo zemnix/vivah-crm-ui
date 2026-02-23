@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useAuthStore } from "@/store/authStore";
 import type { AuthUser } from "@/api/authApi";
 import { useTheme } from "@/providers/theme-provider";
+import { cn } from "@/lib/utils";
 import { Menu, Moon, Sun, ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -15,7 +16,7 @@ interface HeaderProps {
 }
 
 
-export function Header({ onMenuClick, user }: HeaderProps) {
+export function Header({ onMenuClick, user, sidebarCollapsed = false }: HeaderProps) {
   const { logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
@@ -28,28 +29,41 @@ export function Header({ onMenuClick, user }: HeaderProps) {
   const userInitials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
-    <header className="flex items-center justify-between h-12 w-full px-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
-      <div className="flex items-center flex-1 min-w-0">
-        {/* Mobile Menu Button */}
+    <header className="flex items-center h-14 w-full overflow-hidden" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
+      {/* Desktop logo block: matches sidebar width/height */}
+      <div
+        className={cn(
+          "hidden md:flex h-full items-center justify-center flex-shrink-0 rounded-br-3xl transition-all duration-500 ease-in-out",
+          sidebarCollapsed ? "w-[4.5rem]" : "w-60"
+        )}
+        style={{ backgroundColor: "#f8fef8" }}
+      >
+        <img
+          src="/swagat_logo.png"
+          alt="SWAGAT EVENTS"
+          className={cn("w-auto object-contain", sidebarCollapsed ? "h-9" : "h-11")}
+        />
+      </div>
+
+      <div className="flex h-full items-center md:hidden rounded-br-2xl px-2" style={{ backgroundColor: "#f8fef8" }}>
         <Button
           variant="ghost"
           size="sm"
           onClick={onMenuClick}
-          className="md:hidden mr-3 flex-shrink-0"
+          className="mr-1 flex-shrink-0"
           data-testid="menu-button"
         >
           <Menu className="h-4 w-4" />
         </Button>
 
-        {/* Brand */}
-        <div className="flex items-center flex-shrink-0">
-          <span className="text-sm sm:text-base font-semibold tracking-[0.35em] text-foreground">
-            COMRADE FESTIVITY
-          </span>
-        </div>
+        <img
+          src="/swagat_logo.png"
+          alt="SWAGAT EVENTS"
+          className="h-10 w-auto object-contain"
+        />
       </div>
 
-      <div className="flex items-center space-x-2 sm:space-x-3 px-2 sm:px-4 flex-shrink-0">
+      <div className="ml-auto flex items-center space-x-2 sm:space-x-3 px-2 sm:px-4 flex-shrink-0">
         {/* Dark Mode Toggle */}
         <Button
           variant="ghost"

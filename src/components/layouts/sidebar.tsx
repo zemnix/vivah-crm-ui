@@ -36,7 +36,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
     // { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/admin/interactions", icon: MessageSquare, label: "Calls & Meetings" },
     // { href: "/admin/quotations", icon: FileText, label: "Quotations" },
-    // { href: "/admin/master-config", icon: Settings, label: "Master Config" },
+    { href: "/admin/master-config", icon: Settings, label: "Master Config" },
     // { href: "/admin/staff", icon: UserCheck, label: "Staff" },
     // { href: "/admin/reports", icon: BarChart3, label: "Reports" },
   ];
@@ -69,8 +69,8 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
           theme === 'light' ? "bg-gray-900" : ""
         )}>
           <img
-            src="/vinayak_enterprise_logo.jpeg"
-            alt="COMRADE FESTIVITY"
+            src="/swagat_logo.png"
+            alt="SWAGAT EVENTS"
             className="h-8 w-auto object-contain"
           />
         </div>

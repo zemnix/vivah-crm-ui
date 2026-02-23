@@ -22,7 +22,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
-import { ClientProgressionTable } from "@/components/client-progression-table";
 
 interface LeadDetailPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -706,10 +705,10 @@ export default function LeadDetailPage({
               </Card>
             )}
 
-            {/* Client Progression - Only for converted leads */}
-            {lead?.status === 'converted' && (
+            {/* Client Progression hidden */}
+            {/* {lead?.status === 'converted' && (
               <ClientProgressionTable lead={lead} />
-            )}
+            )} */}
           </div>
 
           {/* Activity Timeline */}

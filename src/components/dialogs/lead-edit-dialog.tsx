@@ -24,7 +24,7 @@ const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
   mobile: z.string().regex(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"),
+  dateOfBirth: z.string().optional().or(z.literal("")).or(z.undefined()),
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
   venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
@@ -265,20 +265,26 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     
     try {
       // Prepare customer data
-      let dateOfBirthISO = data.customer.dateOfBirth;
-      if (dateOfBirthISO && dateOfBirthISO.includes('T') === false) {
-        const date = new Date(dateOfBirthISO + 'T00:00:00');
-        if (!isNaN(date.getTime())) {
-          dateOfBirthISO = date.toISOString();
+      // Convert date input (YYYY-MM-DD) to ISO string only when provided
+      const rawDateOfBirth = data.customer.dateOfBirth?.trim();
+      let dateOfBirthISO: string | undefined;
+      if (rawDateOfBirth) {
+        if (rawDateOfBirth.includes('T')) {
+          dateOfBirthISO = rawDateOfBirth;
+        } else {
+          const date = new Date(rawDateOfBirth + 'T00:00:00');
+          if (!isNaN(date.getTime())) {
+            dateOfBirthISO = date.toISOString();
+          }
         }
       }
 
       const customerData = {
         name: data.customer.name,
         mobile: data.customer.mobile,
-        dateOfBirth: dateOfBirthISO,
         whatsappNumber: data.customer.whatsappNumber,
         address: data.customer.address,
+        ...(dateOfBirthISO && { dateOfBirth: dateOfBirthISO }),
         ...(data.customer.email && data.customer.email.trim() !== '' && { email: data.customer.email }),
         ...(data.customer.venueEmail && data.customer.venueEmail.trim() !== '' && { venueEmail: data.customer.venueEmail }),
       };
@@ -441,7 +447,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                     name="customer.dateOfBirth"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date of Birth *</FormLabel>
+                        <FormLabel>Date of Birth</FormLabel>
                         <FormControl>
                           <DatePicker
                             date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
@@ -989,4 +995,3 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
     </Dialog>
   );
 }
-

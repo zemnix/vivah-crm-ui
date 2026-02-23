@@ -55,8 +55,8 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
           // Mobile: full screen and full width
           "fixed z-50 top-0 h-screen w-full left-0",
           // Desktop: below header with specific width
-          "md:z-30 md:top-12 md:h-[calc(100vh-3rem)]",
-          sidebarCollapsed ? "md:w-16" : "md:w-56",
+          "md:z-30 md:top-14 md:h-[calc(100vh-3.5rem)]",
+          sidebarCollapsed ? "md:w-[4.5rem]" : "md:w-60",
           // Mobile visibility - hidden by default, shown when open
           "md:translate-x-0",
           sidebarOpen ? "translate-x-0" : "-translate-x-full md:translate-x-0"
@@ -72,11 +72,11 @@ export function DashboardLayout({ children }: DashboardLayoutProps) {
 
       {/* Main content with left margin to account for fixed sidebar */}
       <div className={cn(
-        "fixed top-12 bottom-0 left-0 right-0 z-10 p-2",
+        "fixed top-14 bottom-0 left-0 right-0 z-10 p-2",
         // Smooth transition for left position - consistent timing
         "transition-[left] duration-500 ease-in-out",
         // Add left margin for fixed sidebar
-        sidebarCollapsed ? "md:left-16" : "md:left-56",
+        sidebarCollapsed ? "md:left-[4.5rem]" : "md:left-60",
         // Add padding to create rounded content area
       )}>
         {/* Fixed rounded white container */}
