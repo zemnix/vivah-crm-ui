@@ -24,6 +24,8 @@ import AdminEventConfig from "@/pages/admin/event-config";
 import AdminSfxConfig from "@/pages/admin/sfx-config";
 import AdminMasterConfig from "@/pages/admin/master-config";
 import AdminConvertedLeads from "@/pages/admin/converted-leads";
+import AdminTodos from "@/pages/admin/todos";
+import AdminItems from "@/pages/admin/items";
 import StaffDashboard from "@/pages/staff/dashboard";
 import StaffLeads from "@/pages/staff/leads";
 import StaffLeadDetail from "@/pages/staff/leads/[id]";
@@ -35,6 +37,8 @@ import NewQuotation from "@/pages/staff/quotations/new";
 import StaffSettings from "@/pages/staff/settings";
 import StaffEnquiries from "@/pages/staff/enquiries";
 import StaffConvertedLeads from "@/pages/staff/converted-leads";
+import StaffTodos from "@/pages/staff/todos";
+import StaffItems from "@/pages/staff/items";
 import NotFound from "@/pages/not-found";
 import { ThemeProvider } from "./providers/theme-provider";
 import { useNotificationInit } from "./hooks/useNotificationInit";
@@ -88,6 +92,8 @@ function App() {
           <Route path="/admin/sfx-config" element={<AdminSfxConfig />} />
           <Route path="/admin/enquiries" element={<AdminEnquiries />} />
           <Route path="/admin/converted-leads" element={<AdminConvertedLeads />} />
+          <Route path="/admin/todos" element={<AdminTodos />} />
+          <Route path="/admin/items" element={<AdminItems />} />
 
           {/* Staff Routes */}
           <Route path="/staff" element={<Navigate to="/staff/dashboard" replace />} />
@@ -105,6 +111,8 @@ function App() {
           <Route path="/staff/settings" element={<StaffSettings />} />
           <Route path="/staff/enquiries" element={<StaffEnquiries />} />
           <Route path="/staff/converted-leads" element={<StaffConvertedLeads />} />
+          <Route path="/staff/todos" element={<StaffTodos />} />
+          <Route path="/staff/items" element={<StaffItems />} />
 
 
           {/* Root redirect */}

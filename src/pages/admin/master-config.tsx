@@ -2,7 +2,7 @@ import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
-import { FileText, Calendar, Sparkles } from "lucide-react";
+import { FileText, Calendar, Sparkles, Package2 } from "lucide-react";
 
 export default function AdminMasterConfig() {
   const navigate = useNavigate();
@@ -95,9 +95,33 @@ export default function AdminMasterConfig() {
               </Button>
             </CardContent>
           </Card>
+
+          {/* Item Master Card */}
+          <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/items')}>
+            <CardHeader>
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-primary/10 rounded-lg">
+                  <Package2 className="h-6 w-6 text-primary" />
+                </div>
+                <div>
+                  <CardTitle>Item Master</CardTitle>
+                  <CardDescription className="mt-1">
+                    Manage quotation item master data
+                  </CardDescription>
+                </div>
+              </div>
+            </CardHeader>
+            <CardContent>
+              <p className="text-sm text-muted-foreground mb-4">
+                Create, search, edit, and delete reusable item names used in quotations.
+              </p>
+              <Button className="w-full" variant="outline">
+                Manage Item Master
+              </Button>
+            </CardContent>
+          </Card>
         </div>
       </div>
     </DashboardLayout>
   );
 }
-

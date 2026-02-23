@@ -13,7 +13,8 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ClipboardList
+  ClipboardList,
+  CheckCircle
 } from "lucide-react";
 
 interface SidebarProps {
@@ -30,6 +31,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
   if (!user) return null;
 
   const adminMenuItems = [
+    { href: "/admin/todos", icon: CheckCircle, label: "Todos" },
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/leads", icon: Users, label: "Leads" },
     { href: "/admin/converted-leads", icon: Users, label: "Converted Leads" },
@@ -42,6 +44,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
   ];
 
   const staffMenuItems = [
+    { href: "/staff/todos", icon: CheckCircle, label: "Todos" },
     { href: "/staff/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/staff/leads", icon: Users, label: "My Leads" },
     { href: "/staff/converted-leads", icon: Users, label: "Converted Leads" },

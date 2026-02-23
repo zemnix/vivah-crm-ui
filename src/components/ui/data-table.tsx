@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useState } from "react";
 import { Skeleton } from "./skeleton";
+import { cn } from "@/lib/utils";
 
 interface Column<T> {
   key: keyof T | string;
@@ -39,6 +40,7 @@ interface DataTableProps<T> {
   onPageChange?: (page: number) => void;
   onPageSizeChange?: (pageSize: number) => void;
   showPageSizeSelector?: boolean; // Add this prop
+  rowClassName?: (item: T) => string;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -59,6 +61,7 @@ export function DataTable<T extends Record<string, any>>({
   onPageChange,
   onPageSizeChange,
   showPageSizeSelector = true, // Default to true for backward compatibility
+  rowClassName,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -222,7 +225,10 @@ export function DataTable<T extends Record<string, any>>({
                 paginatedData.map((item, index) => (
                   <TableRow 
                     key={index}
-                    className={onRowClick ? "cursor-pointer hover:bg-muted/50" : ""}
+                    className={cn(
+                      onRowClick ? "cursor-pointer hover:bg-muted/50" : "",
+                      rowClassName?.(item)
+                    )}
                     onClick={() => onRowClick?.(item)}
                     data-testid={`table-row-${index}`}
                   >

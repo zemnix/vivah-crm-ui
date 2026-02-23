@@ -153,7 +153,7 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation }) => {
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Date:</Text>
-            <Text style={styles.value}>{formatDate(quotation.date)}</Text>
+            <Text style={styles.value}>{formatDate(quotation.date || quotation.createdAt)}</Text>
           </View>
           <View style={styles.row}>
             <Text style={styles.label}>Status:</Text>
@@ -209,9 +209,9 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation }) => {
                 <View key={index} style={styles.tableRow}>
                   <Text style={styles.tableCell}>{item.productName || 'N/A'}</Text>
                   <Text style={styles.tableCell}>{item.quantity || 0}</Text>
-                  <Text style={styles.tableCell}>{formatCurrency(item.unitPrice)}</Text>
+                  <Text style={styles.tableCell}>{formatCurrency(item.unitPrice ?? item.price ?? 0)}</Text>
                   <Text style={styles.tableCell}>{item.gstPercent || 0}%</Text>
-                  <Text style={styles.tableCell}>{formatCurrency(item.total)}</Text>
+                  <Text style={styles.tableCell}>{formatCurrency(item.total ?? item.price ?? 0)}</Text>
                 </View>
               ))}
             </View>
@@ -228,10 +228,10 @@ const QuotationPDF: React.FC<QuotationPDFProps> = ({ quotation }) => {
             <Text style={styles.label}>Tax:</Text>
             <Text style={styles.value}>{formatCurrency(quotation.tax || 0)}</Text>
           </View>
-          {quotation.shippingCost > 0 && (
+          {(quotation.shippingCost || 0) > 0 && (
             <View style={styles.row}>
               <Text style={styles.label}>Shipping:</Text>
-              <Text style={styles.value}>{formatCurrency(quotation.shippingCost)}</Text>
+              <Text style={styles.value}>{formatCurrency(quotation.shippingCost || 0)}</Text>
             </View>
           )}
           <Text style={styles.total}>

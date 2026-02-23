@@ -22,8 +22,21 @@ interface ClientProgressionTableProps {
   lead: Lead;
 }
 
-const PROGRESSION_STATUSES: ProgressionStatus[] = ['Not started', 'In progress', 'Blocked', 'Completed'];
+const PROGRESSION_STATUSES: ProgressionStatus[] = ['Not started', 'In progress', 'Completed'];
 const EVENT_STATUSES: EventStatus[] = ['Booked', 'Not started', 'In progress', 'Completed', 'Cancelled'];
+
+const getStatusColorClasses = (status: string): string => {
+  switch (status) {
+    case 'Not started':
+      return 'bg-red-100 text-red-800 border-red-300';
+    case 'In progress':
+      return 'bg-orange-100 text-orange-800 border-orange-300';
+    case 'Completed':
+      return 'bg-green-100 text-green-800 border-green-300';
+    default:
+      return '';
+  }
+};
 
 export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
   const [progressions, setProgressions] = useState<ClientProgression[]>([]);
@@ -263,12 +276,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.status)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {EVENT_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -283,12 +296,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.ppt)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -303,12 +316,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.site)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -323,12 +336,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.twoD)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -343,12 +356,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.excelDetailing)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -363,12 +376,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.contractForm)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -383,12 +396,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.eventPaymentDetails)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -403,12 +416,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.eventBudget)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -423,12 +436,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.vendorData)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -443,12 +456,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.crewManagement)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -463,12 +476,12 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
                         }
                         disabled={saving === progression._id}
                       >
-                        <SelectTrigger className="w-full">
+                        <SelectTrigger className={`w-full ${getStatusColorClasses(progression.checklist)}`}>
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
                           {PROGRESSION_STATUSES.map((status) => (
-                            <SelectItem key={status} value={status}>
+                            <SelectItem key={status} value={status} className={getStatusColorClasses(status)}>
                               {status}
                             </SelectItem>
                           ))}
@@ -486,4 +499,3 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
     </Card>
   );
 }
-

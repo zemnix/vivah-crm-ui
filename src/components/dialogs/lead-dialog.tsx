@@ -24,7 +24,7 @@ const customerSchema = z.object({
   name: z.string().min(1, "Name is required"),
   email: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
   mobile: z.string().regex(/^\d{10}$/, "Mobile number must be exactly 10 digits"),
-  dateOfBirth: z.string().min(1, "Date of birth is required"), // ISO date string
+  dateOfBirth: z.string().optional().or(z.literal("")).or(z.undefined()), // ISO date string
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
   venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
@@ -230,9 +230,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
       const customerData = {
         name: data.customer.name,
         mobile: data.customer.mobile,
-        dateOfBirth: dateOfBirthISO,
         whatsappNumber: data.customer.whatsappNumber,
         address: data.customer.address,
+        ...(dateOfBirthISO && dateOfBirthISO.trim() !== '' && { dateOfBirth: dateOfBirthISO }),
         ...(data.customer.email && data.customer.email.trim() !== '' && { email: data.customer.email }),
         ...(data.customer.venueEmail && data.customer.venueEmail.trim() !== '' && { venueEmail: data.customer.venueEmail }),
       };
@@ -414,7 +414,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                     name="customer.dateOfBirth"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Date of Birth *</FormLabel>
+                        <FormLabel>Date of Birth</FormLabel>
                         <FormControl>
                           <DatePicker
                             date={field.value ? new Date(field.value + 'T00:00:00') : undefined}

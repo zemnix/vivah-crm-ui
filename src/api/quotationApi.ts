@@ -1,14 +1,20 @@
 import apiClient from './apiClient';
 
-// Quotation types based on backend model
+export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
+
 export interface QuotationItem {
-  productName: string;
-  description: string;
-  quantity: number;
-  unitPrice: number;
-  gstPercent: number;
-  gstAmount: number;
-  total: number;
+  category: string;
+  itemName: string;
+  nos: string;
+  price: number;
+  // Backward-compatible optional fields still used in legacy files.
+  productName?: string;
+  description?: string;
+  quantity?: number;
+  unitPrice?: number;
+  gstPercent?: number;
+  gstAmount?: number;
+  total?: number;
 }
 
 export interface QuotationCustomer {
@@ -24,39 +30,42 @@ export interface AdditionalCharge {
   amount: number;
 }
 
+export interface QuotationLeadRef {
+  _id: string;
+  name: string;
+  email: string;
+}
+
+export interface QuotationStaffRef {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 export interface Quotation {
   _id: string;
-  leadId: {
-    _id: string;
-    name: string;
-    email: string;
-  };
-  staffId: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
+  leadId: QuotationLeadRef;
+  staffId: QuotationStaffRef;
   quotationNo: string;
-  quotationTitle: string;
-  date: string;
+  quotationTitle?: string;
+  date?: string;
   customer: QuotationCustomer;
   items: QuotationItem[];
-  subtotal: number;
-  tax: number;
-  shippingCost: number;
-  shippingTax: number;
-  additionalCharges: AdditionalCharge[];
+  additionalCharges?: AdditionalCharge[];
   grandTotal: number;
-  notes: string;
+  notes?: string;
   validityDate?: string;
   status: QuotationStatus;
   pdfUrl?: string;
   createdAt: string;
   updatedAt: string;
+  // Backward-compatible optional totals.
+  subtotal?: number;
+  tax?: number;
+  shippingCost?: number;
+  shippingTax?: number;
 }
-
-export type QuotationStatus = 'draft' | 'sent' | 'accepted' | 'rejected';
 
 export interface QuotationCreateData {
   leadId: string;
@@ -65,15 +74,12 @@ export interface QuotationCreateData {
   date?: string;
   customer: QuotationCustomer;
   items: QuotationItem[];
-  subtotal: number;
-  tax: number;
-  shippingCost: number;
-  shippingTax: number;
-  additionalCharges: AdditionalCharge[];
+  additionalCharges?: AdditionalCharge[];
   grandTotal: number;
   notes?: string;
   validityDate?: string;
   status?: QuotationStatus;
+  pdfUrl?: string;
 }
 
 export interface QuotationUpdateData {
@@ -83,10 +89,6 @@ export interface QuotationUpdateData {
   date?: string;
   customer?: QuotationCustomer;
   items?: QuotationItem[];
-  subtotal?: number;
-  tax?: number;
-  shippingCost?: number;
-  shippingTax?: number;
   additionalCharges?: AdditionalCharge[];
   grandTotal?: number;
   notes?: string;
@@ -116,7 +118,6 @@ export interface QuotationListResponse {
   };
 }
 
-// Quotation API functions
 export const createQuotationApi = async (quotationData: QuotationCreateData): Promise<Quotation> => {
   const response = await apiClient.post('/quotations', quotationData);
   return response.data.data;
@@ -132,7 +133,10 @@ export const getQuotationByIdApi = async (quotationId: string): Promise<Quotatio
   return response.data.data;
 };
 
-export const updateQuotationApi = async (quotationId: string, updateData: QuotationUpdateData): Promise<Quotation> => {
+export const updateQuotationApi = async (
+  quotationId: string,
+  updateData: QuotationUpdateData
+): Promise<Quotation> => {
   const response = await apiClient.put(`/quotations/${quotationId}`, updateData);
   return response.data.data;
 };
@@ -141,52 +145,69 @@ export const deleteQuotationApi = async (quotationId: string): Promise<void> => 
   await apiClient.delete(`/quotations/${quotationId}`);
 };
 
-// Utility function to get quotation status color
 export const getQuotationStatusColor = (status: QuotationStatus): string => {
   const colors: Record<QuotationStatus, string> = {
-    'draft': 'bg-gray-100 text-gray-800',
-    'sent': 'bg-blue-100 text-blue-800',
-    'accepted': 'bg-green-100 text-green-800',
-    'rejected': 'bg-red-100 text-red-800',
+    draft: 'bg-gray-100 text-gray-800',
+    sent: 'bg-blue-100 text-blue-800',
+    accepted: 'bg-green-100 text-green-800',
+    rejected: 'bg-red-100 text-red-800',
   };
   return colors[status] || 'bg-gray-100 text-gray-800';
 };
 
-// Utility function to get quotation status label
 export const getQuotationStatusLabel = (status: QuotationStatus): string => {
   const labels: Record<QuotationStatus, string> = {
-    'draft': 'Draft',
-    'sent': 'Sent',
-    'accepted': 'Accepted',
-    'rejected': 'Rejected',
+    draft: 'Draft',
+    sent: 'Sent',
+    accepted: 'Accepted',
+    rejected: 'Rejected',
   };
   return labels[status] || status;
 };
 
-// Utility function to calculate item total
-export const calculateItemTotal = (item: Pick<QuotationItem, 'quantity' | 'unitPrice' | 'gstPercent'>): number => {
-  const subtotal = item.quantity * item.unitPrice;
-  const gstAmount = (subtotal * item.gstPercent) / 100;
-  return subtotal + gstAmount;
+export const calculateItemTotal = (item: QuotationItem): number => {
+  if (typeof item.price === 'number' && Number.isFinite(item.price)) {
+    return item.price;
+  }
+  if (typeof item.total === 'number' && Number.isFinite(item.total)) {
+    return item.total;
+  }
+  const quantity = typeof item.quantity === 'number' ? item.quantity : 0;
+  const unitPrice = typeof item.unitPrice === 'number' ? item.unitPrice : 0;
+  return quantity * unitPrice;
 };
 
-// Utility function to calculate quotation totals
+// Backward-compatible argument order.
 export const calculateQuotationTotals = (
   items: QuotationItem[],
   shippingCost: number = 0,
   shippingTax: number = 0,
   additionalCharges: AdditionalCharge[] = []
 ): { subtotal: number; tax: number; additionalChargesTotal: number; grandTotal: number } => {
-  const subtotal = items.reduce((sum, item) => sum + (item.quantity * item.unitPrice), 0);
-  const tax = items.reduce((sum, item) => sum + item.gstAmount, 0);
-  const additionalChargesTotal = additionalCharges.reduce((sum, charge) => sum + (charge.amount || 0), 0);
+  const subtotal = items.reduce((sum, item) => {
+    const fallback = calculateItemTotal(item);
+    const amount = typeof item.price === 'number' ? item.price : fallback;
+    return sum + (Number.isFinite(amount) ? amount : 0);
+  }, 0);
+
+  const tax = items.reduce((sum, item) => {
+    if (typeof item.gstAmount === 'number' && Number.isFinite(item.gstAmount)) {
+      return sum + item.gstAmount;
+    }
+    return sum;
+  }, 0);
+
+  const additionalChargesTotal = additionalCharges.reduce((sum, charge) => {
+    const amount = typeof charge.amount === 'number' ? charge.amount : 0;
+    return sum + amount;
+  }, 0);
+
   const grandTotal = subtotal + tax + shippingCost + shippingTax + additionalChargesTotal;
-  
+
   return {
     subtotal,
     tax,
     additionalChargesTotal,
-    grandTotal
+    grandTotal,
   };
 };
-

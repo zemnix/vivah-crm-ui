@@ -4,6 +4,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSepara
 import { useAuthStore } from "@/store/authStore";
 import type { AuthUser } from "@/api/authApi";
 import { useTheme } from "@/providers/theme-provider";
+import { cn } from "@/lib/utils";
 import { Menu, Moon, Sun, ChevronDown } from "lucide-react";
 import { Link, useNavigate } from "react-router-dom";
 
@@ -15,7 +16,7 @@ interface HeaderProps {
 }
 
 
-export function Header({ onMenuClick, user }: HeaderProps) {
+export function Header({ onMenuClick, user, sidebarCollapsed = false }: HeaderProps) {
   const { logout } = useAuthStore();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
@@ -28,25 +29,30 @@ export function Header({ onMenuClick, user }: HeaderProps) {
   const userInitials = user.name.split(' ').map(n => n[0]).join('').toUpperCase();
 
   return (
-    <header className="flex items-center justify-between h-12 w-full px-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
-      <div className="flex items-center flex-1 min-w-0">
+    <header className="flex items-center justify-between h-12 w-full pr-4" style={{ backgroundColor: 'var(--navbar)' }} data-testid="header">
+      <div className="flex items-center flex-1 min-w-0 h-full">
         {/* Mobile Menu Button */}
         <Button
           variant="ghost"
           size="sm"
           onClick={onMenuClick}
-          className="md:hidden mr-3 flex-shrink-0"
+          className="md:hidden ml-4 mr-3 flex-shrink-0"
           data-testid="menu-button"
         >
           <Menu className="h-4 w-4" />
         </Button>
 
         {/* Logo */}
-        <div className="flex items-center flex-shrink-0">
+        <div
+          className={cn(
+            "flex items-center justify-center flex-shrink-0 self-stretch bg-white/95 rounded-br-xl h-full px-2",
+            sidebarCollapsed ? "md:w-16" : "md:w-56"
+          )}
+        >
           <img
-            src="/vivahlogo.jpg"
+            src="/vivah-creations-logo.png"
             alt="Vivah"
-            className="h-9 sm:h-10 object-contain pl-13 select-none opacity-90 hover:opacity-100 transition-opacity"
+            className="h-9 max-w-full object-contain select-none opacity-90 hover:opacity-100 transition-opacity"
           />
         </div>
       </div>

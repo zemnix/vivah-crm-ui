@@ -1,82 +1,111 @@
-import { useEffect, useState, useRef } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { useNavigate, useParams } from "react-router-dom";
+import { z } from "zod";
+import { zodResolver } from "@hookform/resolvers/zod";
+import { useFieldArray, useForm, useWatch } from "react-hook-form";
+import { ArrowLeft, Download, Eye, Plus, Save, Trash2 } from "lucide-react";
+
 import { DashboardLayout } from "@/components/layouts/dashboard-layout";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { StatusBadge } from "@/components/ui/status-badge";
-import { useQuotationStore } from "@/store/quotationStore";
-import { useAuthStore } from "@/store/authStore";
-import { useLeads } from "@/hooks/useApi";
-import { useUserStore } from "@/store/admin/userStore";
-import { useUploadStore } from "@/store/uploadStore";
-import { ReactPDFService } from "@/services/reactPdfService";
-import { ArrowLeft, Plus, Trash2, Download, Save, Eye, MoreHorizontal, User } from "lucide-react";
-import { useNavigate, useParams } from "react-router-dom";
-import { Skeleton } from "@/components/ui/skeleton";
-import { useForm, useFieldArray } from "react-hook-form";
-import { zodResolver } from "@hookform/resolvers/zod";
-import { z } from "zod";
-import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from "@/components/ui/form";
-import { useToast } from "@/hooks/use-toast";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
-import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { Label } from "@/components/ui/label";
-import type { QuotationCreateData, QuotationUpdateData, QuotationItem } from "@/api/quotationApi";
+import { Textarea } from "@/components/ui/textarea";
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { Form } from "@/components/ui/form";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Skeleton } from "@/components/ui/skeleton";
+import { SearchableLeadSelect } from "@/components/ui/searchable-lead-select";
+import { SearchableItemSelect } from "@/components/ui/searchable-item-select";
+import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 
-// Updated schema to match backend model
+import { useToast } from "@/hooks/use-toast";
+import { useAuthStore } from "@/store/authStore";
+import { useQuotationStore } from "@/store/quotationStore";
+import { getLeadByIdApi, type Lead } from "@/api/leadApi";
+import type { QuotationStatus, QuotationUpdateData } from "@/api/quotationApi";
+
 const quotationItemSchema = z.object({
-  productName: z.string().min(1, "Product name is required"),
-  description: z.string().optional(),
-  quantity: z.number().min(1, "Quantity must be at least 1"),
-  unitPrice: z.number().min(0, "Unit price must be positive"),
-  gstPercent: z.number().min(0).max(100, "GST percentage must be between 0 and 100"),
+  category: z.string().trim(),
+  itemName: z.string().trim().min(1, "Item name is required"),
+  nos: z.string().trim().min(1, "Nos is required"),
+  price: z.number().min(0, "Price must be 0 or more"),
 });
 
-const quotationCustomerSchema = z.object({
-  name: z.string().min(1, "Customer name is required"),
-  address: z.string().min(1, "Address is required"),
-  mobile: z.string().min(1, "Mobile is required"),
-  email: z.union([z.string().email("Valid email is required"), z.literal(""), z.undefined()]).optional(),
-  gst: z.string().optional(),
+const additionalChargeSchema = z.object({
+  name: z.string().trim().min(1, "Charge name is required"),
+  amount: z.number().min(0, "Amount must be 0 or more"),
 });
 
-const quotationSchema = z.object({
-  leadId: z.string().min(1, "Lead is required"),
+const quotationFormSchema = z.object({
+  leadId: z.string().trim().min(1, "Lead is required"),
   quotationTitle: z.string().optional(),
-  customer: quotationCustomerSchema,
-  items: z.array(quotationItemSchema).min(1, "At least one item is required"),
-  additionalCharges: z.array(z.object({
-    name: z.string().min(1),
-    amount: z.number().min(0),
-  })).optional(),
-  notes: z.string().optional(),
+  date: z.string().optional(),
+  status: z.enum(["draft", "sent", "accepted", "rejected"]),
+  customer: z.object({
+    name: z.string().trim().min(1, "Customer name is required"),
+    address: z.string().trim().min(1, "Address is required"),
+    mobile: z.string().trim().min(1, "Mobile is required"),
+    email: z
+      .string()
+      .optional()
+      .or(z.literal(""))
+      .refine((v) => !v || /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v), "Invalid email format"),
+    gst: z.string().optional(),
+  }),
+  items: z.array(quotationItemSchema).min(1, "Add at least one quotation row"),
+  additionalCharges: z.array(additionalChargeSchema).optional(),
   validityDate: z.string().optional(),
-  shippingCost: z.number().min(0, "Shipping cost must be positive").optional(),
-  shippingTax: z.number().min(0, "Shipping tax must be positive").optional(),
+  notes: z.string().optional(),
 });
 
-type QuotationForm = z.infer<typeof quotationSchema>;
+type QuotationForm = z.infer<typeof quotationFormSchema>;
+
+const parseAmount = (value: unknown): number => {
+  if (typeof value === "number") {
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  if (typeof value === "string") {
+    const normalized = value.replace(/,/g, "").trim();
+    if (!normalized) {
+      return 0;
+    }
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : 0;
+  }
+
+  return 0;
+};
+
+const calculateGrandTotal = (
+  items: Array<{ price: unknown }>,
+  additionalCharges: Array<{ amount: unknown }>
+): number => {
+  const itemsTotal = (items || []).reduce((sum, item) => sum + parseAmount(item.price), 0);
+  const chargesTotal = (additionalCharges || []).reduce((sum, charge) => sum + parseAmount(charge.amount), 0);
+  return itemsTotal + chargesTotal;
+};
 
 interface QuotationDetailPageProps {
-  readonly userRole: 'admin' | 'staff';
+  readonly userRole: "admin" | "staff";
   readonly backPath: string;
   readonly testId: string;
 }
 
+const allStatuses: QuotationStatus[] = ["draft", "sent", "accepted", "rejected"];
+
 export default function QuotationDetailPage({
   userRole,
   backPath,
-  testId
-}: QuotationDetailPageProps) {
-  const navigate = useNavigate();
+  testId,
+}: Readonly<QuotationDetailPageProps>) {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const { toast } = useToast();
+  const { user } = useAuthStore();
   const hasFetchedRef = useRef(false);
-  
-  // Zustand store hooks
+
   const {
     selectedQuotation: quotation,
     loading,
@@ -84,25 +113,21 @@ export default function QuotationDetailPage({
     fetchQuotationById,
     updateQuotation,
     deleteQuotation,
-    setSelectedQuotation,
-    pdfGenerating,
+    downloadQuotationPDF,
   } = useQuotationStore();
-  
-  const { user } = useAuthStore();
-  const { fetchAllUsers } = useUserStore();
-  const { uploadPDF, isUploading: isUploadingPDF } = useUploadStore();
-  
-  const { data: leads } = useLeads();
+
+  const [selectedLead, setSelectedLead] = useState<Lead | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [isBackgroundSaving, setIsBackgroundSaving] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
 
   const form = useForm<QuotationForm>({
-    resolver: zodResolver(quotationSchema),
+    resolver: zodResolver(quotationFormSchema),
     defaultValues: {
       leadId: "",
       quotationTitle: "",
+      date: new Date().toISOString().split("T")[0],
+      status: "draft",
       customer: {
         name: "",
         address: "",
@@ -110,244 +135,178 @@ export default function QuotationDetailPage({
         email: "",
         gst: "",
       },
-      items: [
-        { 
-          productName: "", 
-          description: "", 
-          quantity: 1, 
-          unitPrice: 0, 
-          gstPercent: 18 
-        },
-      ],
+      items: [{ category: "", itemName: "", nos: "", price: 0 }],
       additionalCharges: [],
-      notes: "",
       validityDate: "",
-      shippingCost: 0,
-      shippingTax: 0,
+      notes: "",
     },
   });
 
-  const { fields, append, remove } = useFieldArray({
+  const {
+    fields: itemFields,
+    append: appendItem,
+    remove: removeItem,
+  } = useFieldArray({
     control: form.control,
     name: "items",
   });
 
-  const { fields: chargeFields, append: appendCharge, remove: removeCharge } = useFieldArray({
+  const {
+    fields: additionalChargeFields,
+    append: appendAdditionalCharge,
+    remove: removeAdditionalCharge,
+  } = useFieldArray({
     control: form.control,
     name: "additionalCharges",
   });
 
+  const items = useWatch({
+    control: form.control,
+    name: "items",
+  }) || [];
+  const additionalCharges = useWatch({
+    control: form.control,
+    name: "additionalCharges",
+  }) || [];
+  const selectedStatus = form.watch("status");
 
-  // Fetch quotation data on mount
+  const grandTotal = useMemo(() => {
+    return calculateGrandTotal(items, additionalCharges);
+  }, [items, additionalCharges]);
+
+  const allowedTransitions = useMemo(() => {
+    const currentStatus = quotation?.status || "draft";
+    const map: Record<QuotationStatus, QuotationStatus[]> = {
+      draft: ["draft", "sent"],
+      sent: ["sent", "accepted", "rejected"],
+      accepted: ["accepted"],
+      rejected: ["rejected"],
+    };
+    return map[currentStatus];
+  }, [quotation?.status]);
+
+  const loadLeadAndPopulate = async (leadId: string, shouldPopulateCustomer = false) => {
+    if (!leadId) {
+      setSelectedLead(null);
+      return;
+    }
+
+    try {
+      const lead = await getLeadByIdApi(leadId);
+      setSelectedLead(lead);
+
+      if (shouldPopulateCustomer) {
+        form.setValue("customer.name", lead.customer?.name || "");
+        form.setValue("customer.mobile", lead.customer?.mobile || "");
+        form.setValue("customer.email", lead.customer?.email || "");
+        form.setValue("customer.address", lead.customer?.address || "");
+      }
+    } catch (err) {
+      console.error("Failed to load lead details:", err);
+    }
+  };
+
   useEffect(() => {
-    if (id && id !== 'new' && !hasFetchedRef.current) {
+    if (id && !hasFetchedRef.current) {
       hasFetchedRef.current = true;
-      fetchQuotationById(id);
+      void fetchQuotationById(id);
     }
   }, [id, fetchQuotationById]);
 
-  // Fetch staff members for admin
   useEffect(() => {
-    if (userRole === 'admin') {
-      fetchAllUsers();
+    if (!quotation) {
+      return;
     }
-  }, [userRole, fetchAllUsers]);
 
-  // Update form when quotation data loads
-  useEffect(() => {
-    if (quotation && id !== 'new') {
-      // Convert validityDate to YYYY-MM-DD format for HTML date input
-      const formatDateForInput = (dateString: string | undefined) => {
-        if (!dateString) return "";
-        try {
-          const date = new Date(dateString);
-          return date.toISOString().split('T')[0]; // YYYY-MM-DD format
-        } catch (error) {
-          console.error('Error formatting validity date:', error);
-          return "";
-        }
-      };
+    const validityDate = quotation.validityDate ? quotation.validityDate.split("T")[0] : "";
+    const quotationDate = quotation.date ? quotation.date.split("T")[0] : new Date().toISOString().split("T")[0];
 
-      console.log('Loading quotation data:', {
-        validityDate: quotation.validityDate,
-        validityDateType: typeof quotation.validityDate,
-        formatted: formatDateForInput(quotation.validityDate),
-        quotationKeys: Object.keys(quotation)
-      });
+    form.reset({
+      leadId: quotation.leadId?._id || "",
+      quotationTitle: quotation.quotationTitle || "",
+      date: quotationDate,
+      status: quotation.status,
+      customer: {
+        name: quotation.customer?.name || "",
+        address: quotation.customer?.address || "",
+        mobile: quotation.customer?.mobile || "",
+        email: quotation.customer?.email || "",
+        gst: quotation.customer?.gst || "",
+      },
+      items:
+        quotation.items?.length > 0
+          ? quotation.items.map((item) => ({
+              category: item.category || "",
+              itemName: item.itemName || item.productName || "",
+              nos: item.nos || String(item.quantity || ""),
+              price:
+                typeof item.price === "number"
+                  ? item.price
+                  : typeof item.total === "number"
+                    ? item.total
+                    : 0,
+            }))
+          : [{ category: "", itemName: "", nos: "", price: 0 }],
+      additionalCharges: quotation.additionalCharges || [],
+      validityDate,
+      notes: quotation.notes || "",
+    });
 
-      form.reset({
-        leadId: quotation.leadId._id,
-        quotationTitle: quotation.quotationTitle || "",
-        customer: quotation.customer,
-        items: quotation.items.map(item => ({
-          productName: item.productName,
-          description: item.description || "",
-          quantity: item.quantity,
-          unitPrice: item.unitPrice,
-          gstPercent: item.gstPercent,
-        })),
-        additionalCharges: quotation.additionalCharges || [],
-        notes: quotation.notes || "",
-        validityDate: formatDateForInput(quotation.validityDate),
-        shippingCost: quotation.shippingCost || 0,
-        shippingTax: (quotation as any).shippingTax || 0,
-      });
+    if (quotation.leadId?._id) {
+      void loadLeadAndPopulate(quotation.leadId._id, false);
     }
-  }, [quotation, form, id]);
+  }, [quotation, form]);
 
-  const calculateItemTotals = (item: any) => {
-    const subtotal = item.quantity * item.unitPrice;
-    const gstAmount = (subtotal * item.gstPercent) / 100;
-    const total = subtotal + gstAmount;
-    
-    return {
-      subtotal,
-      gstAmount,
-      total,
-    };
-  };
-
-  const calculateTotals = () => {
-    const items = form.watch('items');
-    const shippingCost = form.watch('shippingCost') || 0;
-    const shippingTax = form.watch('shippingTax') || 0;
-    const additionalCharges = form.watch('additionalCharges') || [];
-    
-    let subtotal = 0;
-    let taxTotal = 0;
-
-    items.forEach(item => {
-      const itemTotals = calculateItemTotals(item);
-      subtotal += itemTotals.subtotal;
-      taxTotal += itemTotals.gstAmount;
-    });
-
-    let additionalChargesTotal = 0;
-    additionalCharges.forEach((charge: any) => {
-      additionalChargesTotal += charge.amount || 0;
-    });
-
-    return {
-      subtotal,
-      taxTotal,
-      shippingCost,
-      shippingTax,
-      additionalChargesTotal,
-      grandTotal: subtotal + taxTotal + shippingCost + shippingTax + additionalChargesTotal,
-    };
-  };
-
-  const totals = calculateTotals();
-
-  // Helper function to get valid status transitions
-  const getValidStatusTransitions = (currentStatus: string) => {
-    const validTransitions = {
-      'draft': ['sent'],
-      'sent': ['accepted', 'rejected'],
-      'accepted': [],
-      'rejected': []
-    };
-    return validTransitions[currentStatus as keyof typeof validTransitions] || [];
-  };
-
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      style: 'currency',
-      currency: 'INR',
-      minimumFractionDigits: 2,
-    }).format(amount);
-  };
-
-  const prepareQuotationData = (data: QuotationForm): QuotationCreateData | QuotationUpdateData => {
-    const processedItems: QuotationItem[] = data.items.map(item => {
-      const itemTotals = calculateItemTotals(item);
-      return {
-        productName: item.productName,
-        description: item.description || "",
-        quantity: item.quantity,
-        unitPrice: item.unitPrice,
-        gstPercent: item.gstPercent,
-        gstAmount: itemTotals.gstAmount,
-        total: itemTotals.total,
-      };
-    });
-
-    console.log('Preparing quotation data for update:', {
-      validityDate: data.validityDate,
-      formData: data
-    });
+  const buildPayload = (data: QuotationForm): QuotationUpdateData => {
+    const computedGrandTotal = calculateGrandTotal(data.items, data.additionalCharges || []);
 
     return {
       leadId: data.leadId,
-      staffId: user?.id || "",
-      quotationTitle: data.quotationTitle || "",
+      staffId: quotation?.staffId?._id || user?.id || "",
+      quotationTitle: data.quotationTitle?.trim() || "",
+      date: data.date || new Date().toISOString().split("T")[0],
+      status: data.status,
       customer: {
-        ...data.customer,
-        gst: data.customer.gst || ""
+        name: data.customer.name.trim(),
+        address: data.customer.address.trim(),
+        mobile: data.customer.mobile.trim(),
+        email: data.customer.email?.trim() || "",
+        gst: data.customer.gst?.trim() || "",
       },
-      items: processedItems,
-      subtotal: totals.subtotal,
-      tax: totals.taxTotal,
-      shippingCost: data.shippingCost || 0,
-      shippingTax: data.shippingTax || 0,
-      additionalCharges: data.additionalCharges || [],
-      grandTotal: totals.grandTotal,
-      notes: data.notes || "",
+      items: data.items.map((item) => ({
+        category: item.category.trim(),
+        itemName: item.itemName.trim(),
+        nos: item.nos.trim(),
+        price: parseAmount(item.price),
+      })),
+      additionalCharges: (data.additionalCharges || []).map((charge) => ({
+        name: charge.name.trim(),
+        amount: parseAmount(charge.amount),
+      })),
+      grandTotal: computedGrandTotal,
+      notes: data.notes?.trim() || "",
       validityDate: data.validityDate || undefined,
     };
   };
 
   const onSubmit = async (data: QuotationForm) => {
-    if (!quotation) return;
-    
-    setIsSubmitting(true);
-    
-    // Store original data for rollback
-    const originalQuotation = { ...quotation };
-    
-    try {
-      const quotationData = prepareQuotationData(data);
-      
-      // Optimistic update - update UI immediately
-      const optimisticQuotation = {
-        ...quotation,
-        ...quotationData,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      // Update the store immediately for instant UI feedback
-      setSelectedQuotation(optimisticQuotation as any);
+    if (!id) {
+      return;
+    }
 
-      // update immediately in ui using toast
+    setIsSubmitting(true);
+    try {
+      const payload = buildPayload(data);
+      await updateQuotation(id, payload);
       toast({
-        description: "Changes saved successfully",
+        description: "Quotation updated successfully.",
       });
-      
-      // Update in background
-      setIsBackgroundSaving(true);
-      const result = await updateQuotation(quotation._id, quotationData);
-      setIsBackgroundSaving(false);
-      
-      if (!result) {
-        // If backend update failed, rollback to original data
-        setSelectedQuotation(originalQuotation);
-        toast({
-          description: "Failed to save changes. Please try again.",
-          variant: "destructive",
-        });
-      } else {
-        // Update with server response to ensure consistency
-        setSelectedQuotation(result);
-        toast({
-          description: "Quotation updated successfully",
-        });
-      }
-    } catch (error) {
-      // Rollback on error
-      setSelectedQuotation(originalQuotation);
-      console.error('Error saving quotation:', error);
+      void fetchQuotationById(id);
+    } catch (err) {
+      console.error("Quotation update failed:", err);
       toast({
-        description: "Failed to save quotation. Please try again.",
+        title: "Error",
+        description: "Failed to update quotation.",
         variant: "destructive",
       });
     } finally {
@@ -355,88 +314,26 @@ export default function QuotationDetailPage({
     }
   };
 
-  const handleStatusChange = async (newStatus: string) => {
-    if (!quotation) return;
-    
-    // Store original data for rollback
-    const originalQuotation = { ...quotation };
-    
-    try {
-      // Optimistic update - update UI immediately
-      const optimisticQuotation = {
-        ...quotation,
-        status: newStatus as any,
-        updatedAt: new Date().toISOString(),
-      };
-      
-      setSelectedQuotation(optimisticQuotation);
-      
-      // Show immediate feedback
-      toast({
-        description: `Status changed to ${newStatus}`,
-      });
-      
-      // Update in background
-      setIsBackgroundSaving(true);
-      const result = await updateQuotation(quotation._id, { status: newStatus as any });
-      setIsBackgroundSaving(false);
-      
-      if (!result) {
-        // Rollback on failure
-        setSelectedQuotation(originalQuotation);
-        toast({
-          description: `Failed to ${newStatus} quotation. Please try again.`,
-          variant: "destructive",
-        });
-      } else {
-        // Update with server response
-        setSelectedQuotation(result);
-        toast({
-          description: `Quotation ${newStatus} successfully`,
-        });
-      }
-    } catch (error) {
-      // Rollback on error
-      setSelectedQuotation(originalQuotation);
-      console.error('Error changing quotation status:', error);
-      
-      // Check if it's a status transition error
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      if (errorMessage.includes('Invalid status transition')) {
-        toast({
-          title: "Invalid Status Change",
-          description: errorMessage,
-          variant: "destructive",
-        });
-      } else {
-        toast({
-          description: `Failed to ${newStatus} quotation. Please try again.`,
-          variant: "destructive",
-        });
-      }
+  const handleDelete = async () => {
+    if (!id) {
+      return;
     }
-  };
 
-  const handleDelete = () => {
-    setDeleteDialogOpen(true);
-  };
-
-  const handleConfirmDelete = async () => {
-    if (!quotation) return;
-    
     setIsDeleting(true);
     try {
-      await deleteQuotation(quotation._id);
+      const ok = await deleteQuotation(id);
+      if (!ok) {
+        throw new Error("Delete failed");
+      }
       toast({
-        title: "Success",
-        description: "Quotation deleted successfully",
+        description: "Quotation deleted successfully.",
       });
       navigate(backPath);
-    } catch (error) {
-      console.error('Error deleting quotation:', error);
+    } catch (err) {
+      console.error("Quotation delete failed:", err);
       toast({
         title: "Error",
-        description: "Failed to delete quotation",
+        description: "Failed to delete quotation.",
         variant: "destructive",
       });
     } finally {
@@ -445,457 +342,40 @@ export default function QuotationDetailPage({
     }
   };
 
-
-  const handleDownloadPDF = async () => {
-    if (!quotation) return;
-    
-    try {
-      // Generate PDF blob using ReactPDFService directly
-      const pdfBlob = await ReactPDFService.generateQuotationPDF(quotation);
-      if (!pdfBlob) {
-        throw new Error('Failed to generate PDF');
-      }
-
-      // Create filename
-      const filename = `quotation-${quotation.quotationNo || quotation._id}.pdf`;
-      
-      // Upload PDF to backend
-      const uploadResponse = await uploadPDF(pdfBlob, filename);
-      
-      // Update quotation with PDF URL
-      const updateResult = await updateQuotation(quotation._id, { pdfUrl: uploadResponse.fileURL });
-      
-      if (updateResult) {
-        toast({
-          title: "Success",
-          description: "PDF downloaded and stored in database successfully",
-        });
-      } else {
-        toast({
-          title: "Warning",
-          description: "PDF downloaded but failed to store link in database",
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error downloading and uploading PDF:', error);
+  const handleDownload = async () => {
+    if (!quotation) {
+      return;
+    }
+    const ok = await downloadQuotationPDF(quotation);
+    if (!ok) {
       toast({
         title: "Error",
-        description: "Failed to download PDF",
+        description: "Failed to generate PDF.",
         variant: "destructive",
       });
     }
   };
 
-
-  // Handle new quotation creation
-  if (id === 'new') {
+  if (loading && !quotation) {
     return (
       <DashboardLayout>
-        <div className="p-6" data-testid="new-quotation-page">
-          <div className="flex items-center gap-4 mb-6">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(backPath)}
-              data-testid="back-button"
-            >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Quotations
-            </Button>
-            <h1 className="text-3xl font-bold text-foreground">New Quotation</h1>
-          </div>
-
-          <Card>
-            <CardHeader>
-              <CardTitle>Create Quotation</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Form {...form}>
-                <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                  {/* Lead Selection */}
-                  <FormField
-                    control={form.control}
-                    name="leadId"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Lead</FormLabel>
-                        <Select onValueChange={field.onChange} value={field.value}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="Select a lead" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            {leads?.map((lead) => (
-                              <SelectItem key={lead.id} value={lead.id}>
-                                {lead.name} - {lead.email}
-                              </SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  <FormField
-                    control={form.control}
-                    name="quotationTitle"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Quotation Title</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter quotation title (optional)" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Customer Information */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="customer.name"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Customer Name</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Customer name" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="customer.email"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Email</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="email" placeholder="customer@email.com" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="customer.mobile"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Mobile</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="Mobile number" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    <FormField
-                      control={form.control}
-                      name="customer.gst"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>GST Number</FormLabel>
-                          <FormControl>
-                            <Input {...field} placeholder="GST number (optional)" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <FormField
-                    control={form.control}
-                    name="customer.address"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Address</FormLabel>
-                        <FormControl>
-                          <Textarea {...field} placeholder="Customer address" rows={3} />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-
-                  {/* Items Table */}
-                  <div className="space-y-4">
-                    <div className="flex items-center justify-between">
-                      <h4 className="font-medium">Line Items</h4>
-                      <Button
-                        type="button"
-                        variant="outline"
-                        size="sm"
-                        onClick={() => append({ 
-                          productName: "", 
-                          description: "", 
-                          quantity: 1, 
-                          unitPrice: 0, 
-                          gstPercent: 18 
-                        })}
-                      >
-                        <Plus className="h-4 w-4 mr-2" />
-                        Add Item
-                      </Button>
-                    </div>
-
-                    <Table>
-                      <TableHeader>
-                        <TableRow>
-                          <TableHead>Product</TableHead>
-                          <TableHead>Description</TableHead>
-                          <TableHead>Qty</TableHead>
-                          <TableHead>Unit Price</TableHead>
-                          <TableHead>GST %</TableHead>
-                          <TableHead>Total</TableHead>
-                          <TableHead></TableHead>
-                        </TableRow>
-                      </TableHeader>
-                      <TableBody>
-                        {fields.map((field, index) => {
-                          const item = form.watch(`items.${index}`);
-                          const itemTotals = calculateItemTotals(item);
-
-                          return (
-                            <TableRow key={field.id}>
-                              <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.productName`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        placeholder="Enter product name"
-                                      />
-                                    </FormControl>
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.description`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormControl>
-                                      <Input {...field} placeholder="Description" />
-                                    </FormControl>
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.quantity`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        min="1"
-                                        onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                      />
-                                    </FormControl>
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.unitPrice`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.01"
-                                        min="0"
-                                        value={field.value === 0 ? '' : field.value}
-                                        onChange={(e) => {
-                                          const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                          field.onChange(isNaN(value) ? 0 : value);
-                                        }}
-                                        placeholder="0"
-                                      />
-                                    </FormControl>
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <FormField
-                                  control={form.control}
-                                  name={`items.${index}.gstPercent`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormControl>
-                                      <Input
-                                        {...field}
-                                        type="number"
-                                        step="0.1"
-                                        min="0"
-                                        max="100"
-                                        value={field.value === 0 ? '' : field.value}
-                                        onChange={(e) => {
-                                          const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                          field.onChange(isNaN(value) ? 0 : value);
-                                        }}
-                                        placeholder="0"
-                                      />
-                                    </FormControl>
-                                  )}
-                                />
-                              </TableCell>
-                              <TableCell>
-                                <div className="font-medium">
-                                  {formatCurrency(itemTotals.total)}
-                                </div>
-                              </TableCell>
-                              <TableCell>
-                                {fields.length > 1 && (
-                                  <Button
-                                    type="button"
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => remove(index)}
-                                  >
-                                    <Trash2 className="h-4 w-4" />
-                                  </Button>
-                                )}
-                              </TableCell>
-                            </TableRow>
-                          );
-                        })}
-                      </TableBody>
-                    </Table>
-                  </div>
-
-                  {/* Terms, Notes, and Shipping */}
-                  <div className="grid grid-cols-2 gap-4">
-                    <FormField
-                      control={form.control}
-                      name="notes"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Notes</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} rows={3} placeholder="Additional notes..." />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="validityDate"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Validity Date (Optional)</FormLabel>
-                          <FormControl>
-                            <Input {...field} type="date" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-
-                    <FormField
-                      control={form.control}
-                      name="shippingCost"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Shipping Cost</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={field.value === 0 ? '' : field.value}
-                              onChange={(e) => {
-                                const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                field.onChange(isNaN(value) ? 0 : value);
-                              }}
-                              placeholder="0"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-
-                  <div className="flex justify-end space-x-3">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      onClick={() => navigate(backPath)}
-                    >
-                      Cancel
-                    </Button>
-                    <Button
-                      type="submit"
-                      disabled={isSubmitting}
-                      data-testid="create-quotation"
-                    >
-                      <Save className="mr-2 h-4 w-4" />
-                      {isSubmitting ? "Creating..." : "Create Quotation"}
-                    </Button>
-                  </div>
-                </form>
-              </Form>
-            </CardContent>
-          </Card>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (loading) {
-    return (
-      <DashboardLayout>
-        <div className="p-6">
-          <div className="flex items-center gap-4 mb-6">
-            <Skeleton className="h-8 w-8" />
-            <Skeleton className="h-8 w-48" />
-          </div>
+        <div className="p-6 space-y-4">
+          <Skeleton className="h-10 w-48" />
           <Skeleton className="h-96 w-full" />
         </div>
       </DashboardLayout>
     );
   }
 
-  if (!quotation && !loading) {
+  if (error && !quotation) {
     return (
       <DashboardLayout>
-        <div className="p-6">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-foreground">Quotation Not Found</h2>
-            <p className="text-muted-foreground mt-2">The quotation you're looking for doesn't exist.</p>
-            <Button onClick={() => navigate(backPath)} className="mt-4">
-              Back to Quotations
-            </Button>
-          </div>
-        </div>
-      </DashboardLayout>
-    );
-  }
-
-  if (error) {
-    return (
-      <DashboardLayout>
-        <div className="p-6">
-          <div className="text-center py-12">
-            <h2 className="text-2xl font-bold text-foreground">Error Loading Quotation</h2>
-            <p className="text-muted-foreground mt-2">{error}</p>
-            <Button onClick={() => navigate(backPath)} className="mt-4">
-              Back to Quotations
-            </Button>
-          </div>
+        <div className="p-6 space-y-4">
+          <Button variant="ghost" size="sm" onClick={() => navigate(backPath)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <p className="text-red-600">{error}</p>
         </div>
       </DashboardLayout>
     );
@@ -903,622 +383,297 @@ export default function QuotationDetailPage({
 
   return (
     <DashboardLayout>
-      <div className="p-2 sm:p-3 lg:p-4" data-testid={testId}>
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 mb-6">
-          <div className="flex items-center gap-4">
+      <div className="p-4 sm:p-6 lg:p-8 space-y-6" data-testid={testId}>
+        <div className="flex items-center justify-between flex-wrap gap-3">
+          <Button variant="ghost" size="sm" onClick={() => navigate(backPath)}>
+            <ArrowLeft className="h-4 w-4 mr-2" />
+            Back
+          </Button>
+          <div className="flex items-center gap-2 flex-wrap">
             <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => navigate(backPath)}
-              data-testid="back-button"
+              variant="outline"
+              onClick={() => navigate(`/${userRole}/quotations/${id}/preview`)}
+              disabled={!id}
             >
-              <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Quotations
+              <Eye className="h-4 w-4 mr-2" />
+              Preview
             </Button>
-            <div>
-              <h1 className="text-3xl font-bold text-foreground flex items-center gap-2">
-                Quotation {quotation?.quotationNo}
-                {isBackgroundSaving && (
-                  <span className="text-sm text-muted-foreground font-normal">(Syncing...)</span>
-                )}
-              </h1>
-              <p className="text-muted-foreground">{quotation?.customer.name} - {quotation?.customer.email}</p>
-            </div>
-          </div>
-          <div className="flex items-center gap-2 flex-wrap justify-end">
-            {quotation?.status && (
-              <StatusBadge status={quotation.status as any} type="quotation" />
+            <Button variant="outline" onClick={handleDownload} disabled={!quotation}>
+              <Download className="h-4 w-4 mr-2" />
+              Download PDF
+            </Button>
+            {userRole === "admin" && (
+              <Button variant="destructive" onClick={() => setDeleteDialogOpen(true)}>
+                <Trash2 className="h-4 w-4 mr-2" />
+                Delete
+              </Button>
             )}
-            <Select value={quotation?.status} onValueChange={handleStatusChange}>
-              <SelectTrigger className="w-32" data-testid="status-select">
-                <SelectValue />
-              </SelectTrigger>
-              <SelectContent>
-                {quotation?.status && (
-                  <>
-                    <SelectItem value={quotation.status} disabled>
-                      {quotation.status.charAt(0).toUpperCase() + quotation.status.slice(1)}
-                    </SelectItem>
-                    {getValidStatusTransitions(quotation.status).map((status) => (
-                      <SelectItem key={status} value={status}>
-                        {status.charAt(0).toUpperCase() + status.slice(1)}
-                      </SelectItem>
-                    ))}
-                  </>
-                )}
-              </SelectContent>
-            </Select>
-            
-            {/* Actions Dropdown */}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm">
-                  <MoreHorizontal className="h-4 w-4" />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem onClick={() => navigate(`/${userRole}/quotations/${quotation?._id}/preview`)}>
-                  <Eye className="mr-2 h-4 w-4" />
-                  Preview PDF
-                </DropdownMenuItem>
-                <DropdownMenuItem 
-                  onClick={handleDownloadPDF}
-                  disabled={pdfGenerating || isUploadingPDF}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {pdfGenerating || isUploadingPDF ? "Processing..." : "Download PDF"}
-                </DropdownMenuItem>
-                {userRole === 'admin' && (
-                  <>
-                    <DropdownMenuSeparator />
-                    <DropdownMenuItem
-                      onClick={handleDelete}
-                      className="text-red-600 focus:text-red-600"
-                    >
-                      <Trash2 className="mr-2 h-4 w-4" />
-                      Delete
-                    </DropdownMenuItem>
-                  </>
-                )}
-              </DropdownMenuContent>
-            </DropdownMenu>
           </div>
         </div>
 
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          <div className="lg:col-span-2 space-y-6">
-            {/* Customer Information - Editable */}
+        <div>
+          <h1 className="text-2xl font-semibold">Quotation {quotation?.quotationNo ? `- ${quotation.quotationNo}` : ""}</h1>
+          <p className="text-sm text-muted-foreground">Created by {quotation?.staffId?.name || "N/A"}</p>
+        </div>
+
+        <Form {...form}>
+          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
             <Card>
               <CardHeader>
-                <CardTitle>Customer Information</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                <div className="space-y-4">
-                  <FormField
-                    control={form.control}
-                    name="quotationTitle"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Quotation Title</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Enter quotation title (optional)" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                </div>
-                <div className="grid grid-cols-2 gap-4 mt-4">
-                  <FormField
-                    control={form.control}
-                    name="customer.name"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Customer</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Customer name" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="customer.email"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Email</FormLabel>
-                        <FormControl>
-                          <Input {...field} type="email" placeholder="customer@email.com" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="customer.mobile"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>Mobile</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="Mobile number" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <FormField
-                    control={form.control}
-                    name="customer.gst"
-                    render={({ field }: { field: any }) => (
-                      <FormItem>
-                        <FormLabel>GST Number</FormLabel>
-                        <FormControl>
-                          <Input {...field} placeholder="GST number (optional)" />
-                        </FormControl>
-                        <FormMessage />
-                      </FormItem>
-                    )}
-                  />
-                  <div className="col-span-2">
-                    <FormField
-                      control={form.control}
-                      name="customer.address"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Address</FormLabel>
-                          <FormControl>
-                            <Textarea {...field} rows={3} placeholder="Customer address" />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                  </div>
-                </div>
-                </Form>
-              </CardContent>
-            </Card>
-
-            {/* Quotation Form */}
-            <Card>
-              <CardHeader>
-                <CardTitle>Quotation Details</CardTitle>
-              </CardHeader>
-              <CardContent>
-                <Form {...form}>
-                  <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-6">
-                    {/* Items Table */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <h4 className="font-medium">Line Items</h4>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => append({ 
-                            productName: "", 
-                            description: "", 
-                            quantity: 1, 
-                            unitPrice: 0, 
-                            gstPercent: 18 
-                          })}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Item
-                        </Button>
-                      </div>
-
-                      <Table>
-                        <TableHeader>
-                          <TableRow>
-                            <TableHead>Product</TableHead>
-                            <TableHead>Description</TableHead>
-                            <TableHead>Qty</TableHead>
-                            <TableHead>Unit Price</TableHead>
-                            <TableHead>GST %</TableHead>
-                            <TableHead>Total</TableHead>
-                            <TableHead></TableHead>
-                          </TableRow>
-                        </TableHeader>
-                        <TableBody>
-                          {fields.map((field, index) => {
-                            const item = form.watch(`items.${index}`);
-                            const itemTotals = calculateItemTotals(item);
-
-                            return (
-                              <TableRow key={field.id}>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.productName`}
-                                    render={({ field }: { field: any }) => (
-                                      <FormControl>
-                                        <Input {...field} placeholder="Product name" />
-                                      </FormControl>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.description`}
-                                    render={({ field }: { field: any }) => (
-                                      <FormControl>
-                                        <Input {...field} placeholder="Description" />
-                                      </FormControl>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.quantity`}
-                                    render={({ field }: { field: any }) => (
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          type="number"
-                                          min="1"
-                                          onChange={(e) => field.onChange(parseInt(e.target.value) || 1)}
-                                        />
-                                      </FormControl>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.unitPrice`}
-                                    render={({ field }: { field: any }) => (
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          value={field.value === 0 ? '' : field.value}
-                                          onChange={(e) => {
-                                            const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                            field.onChange(isNaN(value) ? 0 : value);
-                                          }}
-                                          placeholder="0"
-                                        />
-                                      </FormControl>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <FormField
-                                    control={form.control}
-                                    name={`items.${index}.gstPercent`}
-                                    render={({ field }: { field: any }) => (
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          type="number"
-                                          step="0.1"
-                                          min="0"
-                                          max="100"
-                                          value={field.value === 0 ? '' : field.value}
-                                          onChange={(e) => {
-                                            const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                            field.onChange(isNaN(value) ? 0 : value);
-                                          }}
-                                          placeholder="0"
-                                        />
-                                      </FormControl>
-                                    )}
-                                  />
-                                </TableCell>
-                                <TableCell>
-                                  <div className="font-medium">
-                                    {formatCurrency(itemTotals.total)}
-                                  </div>
-                                </TableCell>
-                                <TableCell>
-                                  {fields.length > 1 && (
-                                    <Button
-                                      type="button"
-                                      variant="ghost"
-                                      size="sm"
-                                      onClick={() => remove(index)}
-                                    >
-                                      <Trash2 className="h-4 w-4" />
-                                    </Button>
-                                  )}
-                                </TableCell>
-                              </TableRow>
-                            );
-                          })}
-                        </TableBody>
-                      </Table>
-                    </div>
-
-                    {/* Notes and Shipping */}
-                    <div className="grid grid-cols-2 gap-4">
-                      <FormField
-                        control={form.control}
-                        name="notes"
-                        render={({ field }: { field: any }) => (
-                          <FormItem>
-                            <FormLabel>Notes</FormLabel>
-                            <FormControl>
-                              <Textarea {...field} rows={3} placeholder="Additional notes..." />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                      <FormField
-                        control={form.control}
-                        name="validityDate"
-                        render={({ field }: { field: any }) => (
-                          <FormItem>
-                            <FormLabel>Validity Date (Optional)</FormLabel>
-                            <FormControl>
-                              <Input {...field} type="date" />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-
-                    <FormField
-                        control={form.control}
-                        name="shippingCost"
-                        render={({ field }: { field: any }) => (
-                          <FormItem>
-                            <FormLabel>Shipping Cost</FormLabel>
-                            <FormControl>
-                              <Input
-                                {...field}
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={field.value === 0 ? '' : field.value}
-                                onChange={(e) => {
-                                  const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                  field.onChange(isNaN(value) ? 0 : value);
-                                }}
-                                placeholder="0"
-                              />
-                            </FormControl>
-                            <FormMessage />
-                          </FormItem>
-                        )}
-                      />
-                    <FormField
-                      control={form.control}
-                      name="shippingTax"
-                      render={({ field }: { field: any }) => (
-                        <FormItem>
-                          <FormLabel>Shipping Tax</FormLabel>
-                          <FormControl>
-                            <Input
-                              {...field}
-                              type="number"
-                              step="0.01"
-                              min="0"
-                              value={field.value === 0 ? '' : field.value}
-                              onChange={(e) => {
-                                const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                field.onChange(isNaN(value) ? 0 : value);
-                              }}
-                              placeholder="0"
-                            />
-                          </FormControl>
-                          <FormMessage />
-                        </FormItem>
-                      )}
-                    />
-                    </div>
-
-                    {/* Additional Charges Section */}
-                    <div className="space-y-4">
-                      <div className="flex items-center justify-between">
-                        <Label className="text-base font-semibold">Additional Charges</Label>
-                        <Button
-                          type="button"
-                          variant="outline"
-                          size="sm"
-                          onClick={() => appendCharge({ name: "", amount: 0 })}
-                        >
-                          <Plus className="h-4 w-4 mr-2" />
-                          Add Charge
-                        </Button>
-                      </div>
-
-                      {chargeFields.length > 0 && (
-                        <div className="space-y-3">
-                          {chargeFields.map((field, index) => (
-                            <div key={field.id} className="flex gap-3 items-end">
-                              <div className="flex-1">
-                                <FormField
-                                  control={form.control}
-                                  name={`additionalCharges.${index}.name`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormItem>
-                                      <FormLabel>Charge Name</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          placeholder="e.g., Installation, Training"
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                              <div className="w-40">
-                                <FormField
-                                  control={form.control}
-                                  name={`additionalCharges.${index}.amount`}
-                                  render={({ field }: { field: any }) => (
-                                    <FormItem>
-                                      <FormLabel>Amount (₹)</FormLabel>
-                                      <FormControl>
-                                        <Input
-                                          {...field}
-                                          type="number"
-                                          step="0.01"
-                                          min="0"
-                                          value={field.value === 0 ? '' : field.value}
-                                          onChange={(e) => {
-                                            const value = e.target.value === '' ? 0 : parseFloat(e.target.value);
-                                            field.onChange(isNaN(value) ? 0 : value);
-                                          }}
-                                          placeholder="0"
-                                        />
-                                      </FormControl>
-                                      <FormMessage />
-                                    </FormItem>
-                                  )}
-                                />
-                              </div>
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => removeCharge(index)}
-                                className="mb-2"
-                              >
-                                <Trash2 className="h-4 w-4 text-red-600" />
-                              </Button>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-
-                    <div className="flex justify-end space-x-3">
-                      <Button
-                        type="submit"
-                        disabled={isSubmitting}
-                        data-testid="save-quotation"
-                      >
-                        <Save className="mr-2 h-4 w-4" />
-                        {(() => {
-                          if (isSubmitting) return "Saving...";
-                          if (isBackgroundSaving) return "Syncing...";
-                          return "Save Changes";
-                        })()}
-                      </Button>
-                    </div>
-                  </form>
-                </Form>
-              </CardContent>
-            </Card>
-          </div>
-
-          {/* Summary Sidebar */}
-          <div className="space-y-6">
-            <Card>
-              <CardHeader>
-                <CardTitle>Quotation Summary</CardTitle>
+                <CardTitle>Lead & Customer</CardTitle>
               </CardHeader>
               <CardContent className="space-y-4">
-                <div className="flex justify-between">
-                  <span>Subtotal:</span>
-                  <span>{formatCurrency(totals.subtotal)}</span>
+                <div className="space-y-2">
+                  <Label>Lead</Label>
+                  <SearchableLeadSelect
+                    value={form.watch("leadId")}
+                    onValueChange={(leadId) => {
+                      form.setValue("leadId", leadId, { shouldValidate: true });
+                      void loadLeadAndPopulate(leadId, true);
+                    }}
+                  />
                 </div>
-                <div className="flex justify-between">
-                  <span>Tax:</span>
-                  <span>{formatCurrency(totals.taxTotal)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping:</span>
-                  <span>{formatCurrency(totals.shippingCost)}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span>Shipping Tax:</span>
-                  <span>{formatCurrency(totals.shippingTax)}</span>
-                </div>
-                {totals.additionalChargesTotal > 0 && (
-                  <div className="flex justify-between">
-                    <span>Additional Charges:</span>
-                    <span>{formatCurrency(totals.additionalChargesTotal)}</span>
+
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className="space-y-2">
+                    <Label>Quotation Title</Label>
+                    <Input {...form.register("quotationTitle")} />
                   </div>
-                )}
-                <div className="border-t pt-2">
-                  <div className="flex justify-between font-bold text-lg">
-                    <span>Total:</span>
-                    <span>{formatCurrency(totals.grandTotal)}</span>
+                  <div className="space-y-2">
+                    <Label>Date</Label>
+                    <Input type="date" {...form.register("date")} />
                   </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select
+                      value={selectedStatus}
+                      onValueChange={(value) =>
+                        form.setValue("status", value as QuotationStatus, { shouldValidate: true })
+                      }
+                    >
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {allStatuses.map((status) => (
+                          <SelectItem key={status} value={status} disabled={!allowedTransitions.includes(status)}>
+                            {status.toUpperCase()}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Customer Name</Label>
+                    <Input {...form.register("customer.name")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Mobile</Label>
+                    <Input {...form.register("customer.mobile")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input {...form.register("customer.email")} />
+                  </div>
+                </div>
+
+                <div className="space-y-2">
+                  <Label>Address</Label>
+                  <Textarea rows={2} {...form.register("customer.address")} />
+                </div>
+
+                <div className="space-y-2">
+                  <Label>GST (Optional)</Label>
+                  <Input {...form.register("customer.gst")} />
+                </div>
+
+                <div className="border rounded-md p-3 bg-muted/20">
+                  <p className="text-sm font-medium mb-2">Event Details</p>
+                  {selectedLead?.typesOfEvent?.length ? (
+                    <div className="space-y-2">
+                      {selectedLead.typesOfEvent.map((event, index) => (
+                        <div
+                          key={`${event.name}-${event.date}-${index}`}
+                          className="text-sm flex flex-wrap gap-x-4 gap-y-1"
+                        >
+                          <span>
+                            <strong>Event:</strong> {event.name}
+                          </span>
+                          <span>
+                            <strong>Date:</strong> {new Date(event.date).toLocaleDateString("en-IN")}
+                          </span>
+                          <span>
+                            <strong>Guests:</strong> {event.numberOfGuests}
+                          </span>
+                          <span>
+                            <strong>Session:</strong> {event.dayNight}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">No event details available.</p>
+                  )}
                 </div>
               </CardContent>
             </Card>
 
-            {/* Created By Info for Admin */}
-            {userRole === 'admin' && quotation?.staffId && (
-              <Card>
-                <CardHeader>
-                  <CardTitle>Created By</CardTitle>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center gap-2">
-                    <User className="h-4 w-4 text-muted-foreground" />
-                    <span className="text-sm text-foreground">
-                      {typeof quotation.staffId === 'object' 
-                        ? quotation.staffId.name 
-                        : 'Unknown Staff'
-                      }
-                    </span>
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Quotation Items</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => appendItem({ category: "", itemName: "", nos: "", price: 0 })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Row
+                </Button>
+              </CardHeader>
+              <CardContent>
+                <div className="overflow-x-auto">
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Particulars</TableHead>
+                        <TableHead>Item</TableHead>
+                        <TableHead>NOS</TableHead>
+                        <TableHead>Price</TableHead>
+                        <TableHead className="w-[70px]">Action</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {itemFields.map((field, index) => (
+                        <TableRow key={field.id}>
+                          <TableCell>
+                            <Input {...form.register(`items.${index}.category`)} />
+                          </TableCell>
+                          <TableCell>
+                            <SearchableItemSelect
+                              value={form.watch(`items.${index}.itemName`)}
+                              onValueChange={(itemName) => {
+                                form.setValue(`items.${index}.itemName`, itemName, {
+                                  shouldValidate: true,
+                                  shouldDirty: true,
+                                });
+                              }}
+                              placeholder="Search or create item..."
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Input {...form.register(`items.${index}.nos`)} />
+                          </TableCell>
+                          <TableCell>
+                            <Input
+                              type="number"
+                              step="0.01"
+                              {...form.register(`items.${index}.price`, {
+                                setValueAs: (value) => parseAmount(value),
+                              })}
+                            />
+                          </TableCell>
+                          <TableCell>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              disabled={itemFields.length <= 1}
+                              onClick={() => removeItem(index)}
+                            >
+                              <Trash2 className="h-4 w-4 text-red-600" />
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
+              </CardContent>
+            </Card>
+
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Additional Charges</CardTitle>
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => appendAdditionalCharge({ name: "", amount: 0 })}
+                >
+                  <Plus className="h-4 w-4 mr-2" />
+                  Add Charge
+                </Button>
+              </CardHeader>
+              <CardContent className="space-y-3">
+                {additionalChargeFields.length === 0 && (
+                  <p className="text-sm text-muted-foreground">No additional charges added.</p>
+                )}
+                {additionalChargeFields.map((field, index) => (
+                  <div key={field.id} className="grid grid-cols-1 md:grid-cols-[1fr_220px_60px] gap-3 items-end">
+                    <div className="space-y-2">
+                      <Label>Charge Name</Label>
+                      <Input {...form.register(`additionalCharges.${index}.name`)} />
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Amount</Label>
+                      <Input
+                        type="number"
+                        step="0.01"
+                        {...form.register(`additionalCharges.${index}.amount`, {
+                          setValueAs: (value) => parseAmount(value),
+                        })}
+                      />
+                    </div>
+                    <Button type="button" variant="ghost" size="icon" onClick={() => removeAdditionalCharge(index)}>
+                      <Trash2 className="h-4 w-4 text-red-600" />
+                    </Button>
                   </div>
-                </CardContent>
-              </Card>
-            )}
+                ))}
+              </CardContent>
+            </Card>
 
             <Card>
               <CardHeader>
-                <CardTitle>Actions</CardTitle>
+                <CardTitle>Notes & Total</CardTitle>
               </CardHeader>
-              <CardContent className="space-y-3">
-                <Button 
-                  className="w-full" 
-                  variant="outline"
-                  onClick={() => navigate(`/${userRole}/quotations/${quotation?._id}/preview`)}
-                >
-                  <Eye className="mr-2 h-4 w-4" />
-                  Preview PDF
-                </Button>
-                <Button 
-                  className="w-full" 
-                  variant="outline"
-                  onClick={handleDownloadPDF}
-                  disabled={pdfGenerating || isUploadingPDF}
-                >
-                  <Download className="mr-2 h-4 w-4" />
-                  {pdfGenerating || isUploadingPDF ? "Processing..." : "Download PDF"}
-                </Button>
-                
-                {quotation?.status === 'draft' && (
-                  <Button 
-                    className="w-full"
-                    onClick={() => handleStatusChange('sent')}
-                  >
-                    Mark as Sent
-                  </Button>
-                )}
+              <CardContent className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Validity Date</Label>
+                    <Input type="date" {...form.register("validityDate")} />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Grand Total</Label>
+                    <Input value={grandTotal.toFixed(2)} readOnly />
+                  </div>
+                </div>
+                <div className="space-y-2">
+                  <Label>Comments / Special Instructions</Label>
+                  <Textarea rows={4} {...form.register("notes")} />
+                </div>
               </CardContent>
             </Card>
-          </div>
-        </div>
 
-        {/* Delete Confirmation Dialog */}
+            <div className="flex justify-end">
+              <Button type="submit" disabled={isSubmitting}>
+                <Save className="h-4 w-4 mr-2" />
+                {isSubmitting ? "Saving..." : "Save Changes"}
+              </Button>
+            </div>
+          </form>
+        </Form>
+
         <DeleteConfirmationDialog
           open={deleteDialogOpen}
           onOpenChange={setDeleteDialogOpen}
-          onConfirm={handleConfirmDelete}
-          itemName="quotation"
+          onConfirm={handleDelete}
+          itemName={id}
+          itemType="quotation"
+          title="Delete Quotation"
+          description="Are you sure you want to delete this quotation? This action cannot be undone."
           isLoading={isDeleting}
         />
-
       </div>
     </DashboardLayout>
   );

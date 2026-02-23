@@ -1,6 +1,6 @@
 import apiClient from './apiClient';
 
-export type ProgressionStatus = 'Not started' | 'In progress' | 'Blocked' | 'Completed';
+export type ProgressionStatus = 'Not started' | 'In progress' | 'Completed';
 export type EventStatus = 'Booked' | 'Not started' | 'In progress' | 'Completed' | 'Cancelled';
 
 export interface ClientProgression {
@@ -83,5 +83,4 @@ export const initializeProgressionApi = async (leadId: string): Promise<ClientPr
   const response = await apiClient.post(`/client-progression/initialize/${leadId}`);
   return response.data.data;
 };
-
 

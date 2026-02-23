@@ -1,783 +1,641 @@
-import React from 'react';
-import { Document, Page, Text, View, StyleSheet, pdf, Image } from '@react-pdf/renderer';
-import { Button } from '@/components/ui/button';
-import { Download, Printer } from 'lucide-react';
-import { ToWords } from 'to-words';
+import React from "react";
+import { Document, Image, Page, StyleSheet, Text, View, pdf } from "@react-pdf/renderer";
+import { Download, Printer } from "lucide-react";
+import { ToWords } from "to-words";
 
-import { useToast } from '@/hooks/use-toast';
-import type { Quotation } from '@/api/quotationApi';
-import type { Business } from '@/api/businessApi';
+import { Button } from "@/components/ui/button";
+import { useToast } from "@/hooks/use-toast";
+import { getLeadByIdApi, type Lead } from "@/api/leadApi";
+import type { Quotation } from "@/api/quotationApi";
 
-// Polyfill for Buffer in browser environment (typesafe no-op)
-declare global {
-  interface Window { Buffer?: any }
+interface QuotationDocumentProps {
+  quotation: Quotation;
+  lead: Lead | null;
 }
-if (typeof window !== 'undefined' && !(window as any).Buffer) {
-  (window as any).Buffer = {
-    from: (str: string) => new TextEncoder().encode(str),
-    alloc: (size: number) => new Uint8Array(size),
-  } as any;
+
+interface FlatRow {
+  category: string;
+  itemName: string;
+  nos: string;
+  price: number;
+}
+
+interface CategoryGroup {
+  category: string;
+  rows: FlatRow[];
 }
 
 const styles = StyleSheet.create({
   page: {
-    fontFamily: 'Helvetica',
-    fontSize: 10,
-    paddingTop: 120, // Space for header
-    paddingHorizontal: 30,
-    paddingBottom: 80, // Increased space for footer
-    backgroundColor: 'white',
-    position: 'relative',
+    padding: 24,
+    paddingTop: 74,
+    paddingBottom: 74,
+    fontSize: 11,
+    fontFamily: "Helvetica",
+    color: "#1f2937",
+    backgroundColor: "#ffffff",
   },
   watermark: {
-    position: 'absolute',
-    top: '40%',
-    left: '-4%',
-    width: 700,
-    height: 'auto',
-    transform: 'translate(-50%, -50%) rotate(-45deg)',
-    opacity: 0.1,
+    position: "absolute",
+    top: 240,
+    left: 50,
+    width: 500,
+    height: 301,
+    aspectRatio: 1,
+    opacity: 0.19,
   },
-  // FIXED HEADER STYLES
-  headerFixed: {
-    position: 'absolute',
-    top: 20,
-    left: 30,
-    right: 30,
-    height: 100,
-  },
-  headerTop: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: 8,
-  },
-  companyLogoGSTINSection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: 2,
-    borderBottom: '1px solid black',
-  },
-  companyLogo: {
-    width: 100,
-    height: 'auto',
-  },
-  companySection: {
-    flex: 1,
-  },
-  companyTagline: {
-    fontSize: 11,
-    fontFamily: 'Helvetica-Bold',
-    textTransform: 'uppercase',
-    marginBottom: 1,
-  },
-  addressSection: {
-    textAlign: 'left',
-    fontSize: 10,
-  },
-  gstinInfo: {
-    marginBottom: 8,
-  },
-  addressInfo: {
-    lineHeight: 0.75,
-  },
-  // FIXED FOOTER STYLES
-  footerFixed: {
-    position: 'absolute',
-    bottom: 26,
-    left: 30,
-    right: 30,
-    fontSize: 9,
-  },
-  footerAddress: {
-    fontFamily: 'Helvetica-Bold',
-  },
-  footerContact: {
-    width: '100%',
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-  },
-  footerDate: {
-    fontSize: 8,
-  },
-  // MAIN CONTENT STYLES
-  mainContent: {
-    // This will automatically flow across pages
-  },
-  quotationTitle: {
-    fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
-    margin: '4 0',
-    marginBottom: 10,
-    marginTop: -7,
-  },
-  quotationMeta: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-    marginTop: 3,
-    fontSize: 10,
-  },
-  metaLeft: {
-    lineHeight: 0.94,
-    textTransform: 'uppercase',
-  },
-  metaRight: {
-    textAlign: 'left',
-  },
-  customerSection: {
-    marginBottom: 15,
-    fontSize: 10,
-  },
-  subjectLine: {
-    marginBottom: 10,
-  },
-  greeting: {
-    marginTop: 8,
-    lineHeight: 0.82,
-  },
-  table: {
-    width: '100%',
-  },
-  tableHeader: {
-    flexDirection: 'row',
-    backgroundColor: '#74b4d4',
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'center',
-    border: '1px solid black',
-    borderRight: 'none',
-  },
-  tableRow: {
-    flexDirection: 'row',
-    fontSize: 9,
-    border: '1px solid black',
-    borderTop: 'none',
-    borderRight: 'none',
-    minHeight: 22,
-  },
-  productCol: {
-    width: '42%',
-    paddingRight: 4,
-    textAlign: 'center',
-    borderRight: '1px solid black',
-    padding: 4,
-  },
-  qtyCol: {
-    width: '10%',
-    textAlign: 'center',
-    borderRight: '1px solid black',
-    padding: 4,
-  },
-  priceCol: {
-    width: '15%',
-    textAlign: 'center',
-    borderRight: '1px solid black',
-    padding: 4,
-  },
-  gstCol: {
-    width: '18%',
-    textAlign: 'center',
-    borderRight: '1px solid black',
-    padding: 4,
-  },
-  totalCol: {
-    width: '15%',
-    textAlign: 'center',
-    borderRight: '1px solid black',
-    padding: 4,
-  },
-  productName: {
-    marginBottom: 2,
-    textAlign: 'left',
-    textTransform: 'uppercase',
-  },
-  productDesc: {
-    fontSize: 8,
-    color: '#666',
-    fontStyle: 'italic',
-    textTransform: 'uppercase',
-    textAlign: 'left',
-  },
-  totalsSection: {
-    marginBottom: 16,
-  },
-  totalsTableHidden: {
-    display: 'none',
-    width: '66.91%',
-  },
-  totalsTable: {
-    width: '33.09%',
-    marginLeft: 'auto',
-    borderLeft: '1px solid black',
-  },
-  totalRow: {
-    flexDirection: 'row',
-  },
-  totalLabel: {
-    padding: 4,
-    fontSize: 9,
-    fontFamily: 'Helvetica-Bold',
-    textAlign: 'right',
-    backgroundColor: '#f5f5f5',
-    width: '54.54%',
-    borderRight: '1px solid black',
-    borderBottom: '1px solid black',
-  },
-  totalAmount: {
-    width: '45.45%',
-    padding: 4,
-    fontSize: 9,
-    textAlign: 'right',
-    borderRight: '1px solid black',
-    borderBottom: '1px solid black',
-  },
-  grandTotalRow: {
-    fontFamily: 'Helvetica-Bold',
-    fontSize: 10,
-  },
-  totalWrittenInWords: {
+  banner: {
+    backgroundColor: "#e87f4f",
+    minHeight: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    borderRadius: 2,
     marginBottom: 14,
   },
-  totalWrittenInWordsText: {
-    fontSize: 10,
-    fontFamily: 'Helvetica-Bold',
+  bannerFixed: {
+    position: "absolute",
+    top: 24,
+    left: 24,
+    right: 24,
+    backgroundColor: "#e87f4f",
+    minHeight: 34,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 10,
+    paddingVertical: 0,
+    borderRadius: 2,
   },
-  termsSection: {
-    marginBottom: 2,
+  bannerLeft: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 10,
   },
-  termsTitle: {
-    backgroundColor: '#02f72b',
-    color: 'black',
-    padding: 4,
-    fontSize: 14,
-    fontFamily: 'Helvetica-Bold',
-    marginBottom: 2,
-    textDecoration: 'underline',
+  logo: {
+    width: 46,
+    height: 36,
+    objectFit: "contain",
   },
-  termsContent: {
-    backgroundColor: '#02f72b',
-    alignSelf: 'flex-start',
-    color: 'black',
+  bannerCompany: {
+    color: "#ffffff",
+    fontSize: 13,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: 0.4,
+  },
+  bannerTitle: {
+    color: "#ffffff",
+    fontSize: 25,
+    fontFamily: "Times-Bold",
+  },
+  twoCol: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    gap: 18,
+    marginBottom: 20,
+  },
+  col: {
+    flex: 1,
+  },
+  sectionTitle: {
+    fontSize: 15,
+    fontFamily: "Helvetica-Bold",
+    color: "#1f3557",
+    marginBottom: 8,
+  },
+  lineText: {
+    marginBottom: 4,
+  },
+  muted: {
+    color: "#4b5563",
+    marginTop: 100
+  },
+  divider: {
+    borderBottomWidth: 1,
+    borderBottomColor: "#d1d5db",
+    marginVertical: 10,
+  },
+  eventCard: {
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 3,
+    padding: 8,
+    marginBottom: 8,
+    backgroundColor: "#f8fafc",
+  },
+  eventHeading: {
+    fontFamily: "Helvetica-Bold",
+    marginBottom: 4,
+  },
+  commentsTitle: {
+    fontSize: 13,
+    fontFamily: "Helvetica-Bold",
+    color: "#1f3557",
+    marginBottom: 6,
+  },
+  commentsText: {
+    minHeight: 42,
+    borderWidth: 1,
+    borderColor: "#d1d5db",
+    borderRadius: 3,
+    padding: 8,
+    backgroundColor: "#fafafa",
+  },
+  tableHeaderRow: {
+    flexDirection: "row",
+    backgroundColor: "#556b95",
+    color: "#ffffff",
+    borderWidth: 1,
+    borderColor: "#94a3b8",
+  },
+  tableRow: {
+    flexDirection: "row",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#cbd5e1",
+    minHeight: 28,
+  },
+  th: {
+    fontFamily: "Helvetica-Bold",
+    paddingVertical: 7,
+    paddingHorizontal: 6,
+    textAlign: "center",
     fontSize: 11,
-    lineHeight: 1.4,
-    marginBottom: 10,
   },
-  backAndSignature: {
-    marginTop: 25,
-    fontSize: 10,
+  td: {
+    paddingVertical: 6,
+    paddingHorizontal: 6,
+    fontSize: 10.5,
   },
-  bankAndSignatureDetails: {
+  colParticular: {
+    width: "32%",
+    borderRightWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  colItem: {
+    width: "32%",
+    borderRightWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  colNos: {
+    width: "16%",
+    borderRightWidth: 1,
+    borderColor: "#cbd5e1",
+    textAlign: "center",
+  },
+  colPrice: {
+    width: "20%",
+    textAlign: "right",
+  },
+  groupedRow: {
+    flexDirection: "row",
+    borderLeftWidth: 1,
+    borderRightWidth: 1,
+    borderBottomWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  categorySpanCell: {
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  categorySpanText: {
+    textAlign: "center",
+    width: "100%",
+  },
+  groupedRight: {
+    width: "68%",
+  },
+  groupedInnerRow: {
+    flexDirection: "row",
+    minHeight: 28,
+  },
+  groupedInnerRowDivider: {
+    borderBottomWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  colItemInGroup: {
+    width: "47.0588%",
+    borderRightWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  colNosInGroup: {
+    width: "23.5294%",
+    borderRightWidth: 1,
+    borderColor: "#cbd5e1",
+    textAlign: "center",
+  },
+  colPriceInGroup: {
+    width: "29.4118%",
+    textAlign: "right",
+  },
+  summary: {
+    marginTop: 12,
+    alignSelf: "flex-end",
+    width: "45%",
+    borderWidth: 1,
+    borderColor: "#cbd5e1",
+  },
+  summaryRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderColor: "#e2e8f0",
+    paddingVertical: 6,
+    paddingHorizontal: 8,
+  },
+  summaryLast: {
+    backgroundColor: "#ecf2ff",
+    fontFamily: "Helvetica-Bold",
+  },
+  inWords: {
     marginTop: 10,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    lineHeight: 0.82
+    fontSize: 10.5,
   },
-  signature: {
-    width: 150,
-    height: 'auto',
+  pageFooter: {
+    position: "absolute",
+    left: 24,
+    right: 24,
+    bottom: 20,
+    paddingTop: 4,
+    textAlign: "right",
+    fontSize: 9.5,
+    color: "#6b7280",
   },
 });
 
-interface QuotationDocumentProps {
-  quotation: Quotation;
-  business?: Business;
-}
+const safeDate = (value?: string): string => {
+  if (!value) {
+    return new Date().toLocaleDateString("en-IN");
+  }
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return new Date().toLocaleDateString("en-IN");
+  }
+  return date.toLocaleDateString("en-IN");
+};
 
-const QuotationDocument: React.FC<QuotationDocumentProps> = ({ quotation }) => {
-  const formatCurrencyToWords = (amount: number) => {
-    try {
-      const toWords = new ToWords({
-        localeCode: "en-IN",
-      });
-      const words = toWords.convert(Number(amount)) + ' Rupees Only';
-      return words.charAt(0).toUpperCase() + words.slice(1);
-    } catch (error) {
-      console.error('Error converting to words:', error);
-      return `${amount} Rupees Only`;
+const formatAmount = (amount: number): string => {
+  const numeric = Number.isFinite(amount) ? amount : 0;
+  return numeric.toLocaleString("en-IN", { minimumFractionDigits: 0, maximumFractionDigits: 2 });
+};
+
+const amountInWords = (amount: number): string => {
+  try {
+    const toWords = new ToWords({ localeCode: "en-IN" });
+    const words = toWords.convert(Math.round(amount || 0));
+    return `${words.charAt(0).toUpperCase()}${words.slice(1)} only`;
+  } catch {
+    return `${amount} only`;
+  }
+};
+
+const toFlatRows = (items: Quotation["items"]): FlatRow[] => {
+  const rows: FlatRow[] = [];
+  let previousCategory = "";
+
+  (items || []).forEach((item) => {
+    const explicitCategory = (item.category || "").trim();
+    const category = explicitCategory || previousCategory;
+    const row: FlatRow = {
+      category,
+      itemName: (item.itemName || item.productName || "").trim(),
+      nos: (item.nos || (typeof item.quantity === "number" ? String(item.quantity) : "")).trim(),
+      price:
+        typeof item.price === "number"
+          ? item.price
+          : typeof item.total === "number"
+            ? item.total
+            : typeof item.unitPrice === "number"
+              ? item.unitPrice
+              : 0,
+    };
+    rows.push(row);
+    if (explicitCategory) {
+      previousCategory = explicitCategory;
     }
-  };
+  });
 
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('en-IN', {
-      minimumFractionDigits: 2,
-      maximumFractionDigits: 2,
-    }).format(amount || 0);
-  };
+  return rows;
+};
 
-  const formatDate = (dateString: string) => {
-    if (!dateString) return new Date().toLocaleDateString('en-GB');
-    try {
-      return new Date(dateString).toLocaleDateString('en-GB');
-    } catch {
-      return new Date().toLocaleDateString('en-GB');
+const toCategoryGroups = (rows: FlatRow[]): CategoryGroup[] => {
+  const groups: CategoryGroup[] = [];
+  let currentGroup: CategoryGroup | null = null;
+
+  rows.forEach((row) => {
+    if (!currentGroup || currentGroup.category !== row.category) {
+      currentGroup = {
+        category: row.category,
+        rows: [row],
+      };
+      groups.push(currentGroup);
+      return;
     }
-  };
 
-  // Calculate totals
-  const subtotal = quotation.items?.reduce((sum: number, item: any) => sum + (item.quantity * item.unitPrice), 0) || 70000;
-  const taxTotal = quotation.items?.reduce((sum: number, item: any) => sum + (item.gstAmount || 0), 0) || 12600;
-  const shippingCost = quotation.shippingCost || 0;
-  const shippingTax = quotation.shippingTax || 0;
-  const additionalChargesTotal = quotation.additionalCharges?.reduce((sum: number, charge: any) => sum + (charge.amount || 0), 0) || 0;
-  const grandTotal = subtotal + taxTotal + shippingCost + shippingTax + additionalChargesTotal;
+    currentGroup.rows.push(row);
+  });
+
+  return groups;
+};
+
+const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotation, lead }) => {
+  const rows = toFlatRows(quotation.items || []);
+  const groupedRows = toCategoryGroups(rows);
+  const itemsTotal = rows.reduce((sum, row) => sum + (Number(row.price) || 0), 0);
+  const additionalChargesTotal = (quotation.additionalCharges || []).reduce(
+    (sum, charge) => sum + (Number(charge.amount) || 0),
+    0
+  );
+  const computedTotal = itemsTotal + additionalChargesTotal;
+  const quotedGrandTotal = Number(quotation.grandTotal);
+  const grandTotal =
+    Number.isFinite(quotedGrandTotal) && Math.abs(quotedGrandTotal - computedTotal) < 0.01
+      ? quotedGrandTotal
+      : computedTotal;
 
   return (
     <Document>
-      <Page size="A4" style={styles.page} wrap>
-        {/* FIXED HEADER - This will appear on every page */}
-        <View style={styles.headerFixed} fixed>
-          <View style={styles.companyLogoGSTINSection}>
-            <View>
-              <Image src='/vinayak_enterprise_logo.png' style={styles.companyLogo} />
-            </View>
-            <View>
-              <Text>GSTIN NO: 21HCGPS1097Q2ZV</Text>
-            </View>
+      <Page size="A4" style={styles.page}>
+        <Image src="/vivah-creations-logo.png" style={styles.watermark} fixed />
+        <Text
+          style={styles.pageFooter}
+          fixed
+          render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
+        />
+        <View style={styles.bannerFixed} fixed>
+          <View style={styles.bannerLeft}>
+            <Image src="/vivah-creations-logo.png" style={styles.logo} />
           </View>
-          <View style={styles.headerTop}>
-            <View style={styles.companySection}>
-              <Text style={styles.companyTagline}>MANUFACTURER & SUPPLIER OF</Text>
-              <Text style={styles.companyTagline}>ALL TYPES OF DISPOSABLE PRODUCTS</Text>
-              <Text style={styles.companyTagline}>MAKING MACHINE</Text>
-            </View>
-            <View style={styles.addressSection}>
-              <View style={styles.addressInfo}>
-                {/* <Text>{business?.address?.split(',')[0] || 'Plot No: 546/1960 Near Mo bus'}</Text>
-                <Text>{business?.address?.split(',')[1] || 'stand, Patia Station road,'}</Text>
-                <Text>{business?.address?.split(',')[2] || 'Bhubaneswar, 751024'}</Text>
-                <Text>Ph: {business?.phone?.[0] || '7978608969,7205311711'}</Text> */}
-                <Text>Plot No: 546/1960, Near Mo bus depot</Text>
-                <Text>Patia Station Rd, Bhubaneswar, 751024</Text>
-                <Text>Ph: 7205311711, 9124043711</Text>
-              </View>
-            </View>
+          <Text style={styles.bannerTitle}>Quotation</Text>
+        </View>
+
+        <View style={styles.twoCol}>
+          <View style={styles.col}>
+            <Text style={styles.sectionTitle}>Company Address</Text>
+            <Text style={styles.lineText}>VIVAH CREATIONS</Text>
+            <Text style={styles.lineText}>SATYA VIHAR, BBSR</Text>
+            <Text style={styles.lineText}>MOB-7205946778 / 9777144463</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Quotation For</Text>
+            <Text style={styles.lineText}>{quotation.customer?.name || "N/A"}</Text>
+            <Text style={styles.lineText}>{quotation.customer?.mobile || "N/A"}</Text>
+            <Text style={styles.lineText}>{quotation.customer?.address || "N/A"}</Text>
+          </View>
+          <View style={styles.col}>
+            <Text style={[styles.sectionTitle, { textAlign: "right" }]}>Quotation Details</Text>
+            <Text style={[styles.lineText, { textAlign: "right" }]}>
+              <Text style={styles.muted}>Ref No:</Text> {quotation.quotationNo || "N/A"}
+            </Text>
+            <Text style={[styles.lineText, { textAlign: "right" }]}>
+              <Text style={styles.muted}>Date:</Text> {safeDate(quotation.date || quotation.createdAt)}
+            </Text>
           </View>
         </View>
 
-        {/* FIXED FOOTER - This will appear on every page */}
-        <View style={styles.footerFixed} fixed>
-          <Text style={styles.footerAddress}>
-            Plot No: 546/1960, Near Mo bus depot, Patia Station Rd, Bhubaneswar- 751024, Khurdha, Odisha
-          </Text>
-          <View style={styles.footerContact}>
-            <View>
-              <Text>
-                <Text style={{ fontWeight: 'bold' }}>Mail Id:</Text> -info@myvinayakindustries.in, www.myvinayakindustries.com
-              </Text>
+        <Text style={styles.sectionTitle}>Event Details</Text>
+        {lead?.typesOfEvent?.length ? (
+          lead.typesOfEvent.map((event, index) => (
+            <View key={`${event.name}-${event.date}-${index}`} style={styles.eventCard}>
+              <Text style={styles.eventHeading}>{event.name}</Text>
+              <Text>Date: {safeDate(event.date)}</Text>
+              <Text>Day/Night: {event.dayNight}</Text>
             </View>
-            <View>
-              <Text style={styles.footerDate}>
-                {formatDate(new Date().toISOString())}
-              </Text>
-            </View>
+          ))
+        ) : (
+          <View style={styles.eventCard}>
+            <Text >No event details available.</Text>
           </View>
+        )}
+
+        <Text style={{marginTop: 10}} ></Text>
+
+        <Text style={styles.sectionTitle}>Items</Text>
+
+        <View style={styles.tableHeaderRow}>
+          <Text style={[styles.th, styles.colParticular]}>PARTICULARS</Text>
+          <Text style={[styles.th, styles.colItem]}>Item</Text>
+          <Text style={[styles.th, styles.colNos]}>NOS</Text>
+          <Text style={[styles.th, styles.colPrice]}>Amount</Text>
         </View>
 
-        {/* WATERMARK */}
-        <Image src='/vinayak_enterprise_logo.png' style={styles.watermark} fixed />
-
-        {/* MAIN CONTENT - This will automatically flow across pages */}
-        <View style={styles.mainContent}>
-          {/* Quotation Title */}
-          <Text style={styles.quotationTitle}>
-            {quotation.quotationTitle || `QUOTATION FOR ${quotation.items?.[0]?.productName?.toUpperCase() || 'MACHINE'}`}
-          </Text>
-
-          {/* Quotation Meta */}
-          <View style={styles.quotationMeta}>
-            <View style={styles.metaLeft}>
-              <Text>To,</Text>
-              <Text>
-                {quotation.customer?.name || 'CUSTOMER NAME'},
-              </Text>
-              <Text>{quotation.customer?.address || 'Customer Address'}</Text>
-              <Text>MOBILE NO. - {quotation.customer?.mobile || 'Customer Mobile'}</Text>
-              {
-                quotation.customer?.gst && (
-                  <Text>GSTIN NO - {quotation.customer?.gst || ''}</Text>
-                )
-              }
-            </View>
-            <View style={styles.metaRight}>
-              <Text>Quotation No: {quotation.quotationNo || 'VIN00000'}</Text>
-              <Text style={{ marginTop: 5, alignSelf: 'flex-end' }}>Date: {new Date().toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' })}</Text>
-            </View>
-          </View>
-
-          {/* Customer Section */}
-          <View style={styles.customerSection}>
-            <Text style={styles.subjectLine}>SUB: TENDERING FOR THE QUOTATION</Text>
-            <View style={styles.greeting}>
-              <Text>
-                Dear <Text style={{ textTransform: 'uppercase' }}>{quotation.customer?.name || 'Customer'}</Text>,
-              </Text>
-              <Text>Thank you for your interest in our High-Quality Products. We are pleased to quote our best price for the below mentioned products as follows.</Text>
-            </View>
-          </View>
-
-          {/* Items Table */}
-          <View style={styles.table}>
-            {/* Table Header */}
-            <View style={styles.tableHeader}>
-              <Text style={styles.productCol}>Product</Text>
-              <Text style={styles.qtyCol}>Quantity</Text>
-              <Text style={styles.priceCol}>Sale Price</Text>
-              <Text style={styles.gstCol}>GST Amount</Text>
-              <Text style={styles.totalCol}>Total</Text>
-            </View>
-
-            {/* Table Rows */}
-            {quotation.items?.map((item, index) => {
-              const subtotalAmount = item.quantity * item.unitPrice;
-              const gstAmount = item.gstAmount || (subtotalAmount * (item.gstPercent || 18)) / 100;
-              const totalAmount = subtotalAmount + gstAmount;
-
-              return (
-                <View key={`item-${item.productName}-${index}`} style={styles.tableRow} wrap={false}>
-                  <View style={styles.productCol}>
-                    <Text style={styles.productName}>{item.productName || 'Product Name'}</Text>
-                    {item.description && (
-                      <Text style={styles.productDesc}>{item.description}</Text>
-                    )}
-                  </View>
-                  <Text style={styles.qtyCol}>{item.quantity || 1}</Text>
-                  <Text style={{ ...styles.priceCol, textAlign: 'right' }}>{formatCurrency(item.unitPrice || 0)}</Text>
-                  <Text style={{ ...styles.gstCol, textAlign: 'right' }}>{`${formatCurrency(gstAmount)} (@${item.gstPercent || 18}%)`}</Text>
-                  <Text style={{ ...styles.totalCol, textAlign: 'right' }}>{formatCurrency(totalAmount)}</Text>
-                </View>
-              );
-            })}
-          </View>
-
-          {/* Totals Section */}
-          <View style={styles.totalsSection} wrap={false}>
-            <View style={styles.totalsTableHidden}></View>
-            <View style={styles.totalsTable}>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Subtotal</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(quotation.subtotal || subtotal)}</Text>
-              </View>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Tax</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(quotation.tax || taxTotal)}</Text>
-              </View>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Shipping Cost</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(shippingCost)}</Text>
-              </View>
-              <View style={styles.totalRow}>
-                <Text style={styles.totalLabel}>Shipping Tax</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(shippingTax)}</Text>
-              </View>
-              {quotation.additionalCharges && quotation.additionalCharges.length > 0 && quotation.additionalCharges.map((charge: any, index: number) => (
-                <View key={`charge-${index}`} style={styles.totalRow}>
-                  <Text style={styles.totalLabel}>{charge.name}</Text>
-                  <Text style={styles.totalAmount}>{formatCurrency(charge.amount)}</Text>
-                </View>
-              ))}
-              <View style={[styles.totalRow, styles.grandTotalRow]}>
-                <Text style={styles.totalLabel}>Grand Total</Text>
-                <Text style={styles.totalAmount}>{formatCurrency(quotation.grandTotal || grandTotal)}</Text>
-              </View>
-            </View>
-          </View>
-
-          <View style={styles.totalWrittenInWords}>
-            <Text style={styles.totalWrittenInWordsText}>In Words: {formatCurrencyToWords(quotation.grandTotal || grandTotal)}</Text>
-          </View>
-
-          {/* Terms & Conditions */}
-          <View style={styles.termsSection}>
-            <View style={styles.termsContent}>
-              <Text style={styles.termsTitle}>Terms & conditions:{''}</Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>ORDER & PAYMENTS:</Text> "To book your order you must pay 50% in advance and rest before delivery. Order once placed cannot be cancelled whatsoever and incase of cancellation the total advance paid by the customer will be forfeited."
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>TAXES:</Text> 18% GST will be charged on the product extra apart from the machinery cost.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>MANUFACTURING & TRANSPORT:</Text> Transportation of the machinery will be from anywhere in India and you will pay the packaging and transportation charges from the manufacturing factory to your place. You must arrange transportation of your machinery from the factory and in case you are unable to arrange it you can ask us to arrange it for you.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>MACHINE INSURANCE:</Text> The insurance of transportation is customers scope & should be borne by thee customer, if consignment is not insured it will be at customer risk. Any lost or damage of the machinery cannot be claimed to us by the customer.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>DELIVERY:</Text> Delivery time is 2 to 4 Weeks depending upon the machine availability. The complete manufacturing process of the machinery takes between 2 to 3 weeks. Once we receive the advance payment, we will start manufacturing the machinery and after receiving the full and final payment from the customer it takes additional 10 to 15 days' time to complete the machine manufacturing, testing and transport arrangement, after which the delivery will take place.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>INSTALLATION:</Text> Our Engineer will reach customers site/factory for installation after the machinery is received & raw material arrangement is done by the customer for the machine trail/installation. Once customer arranges the raw materials and confirms us, our technician will reach their place within 10 to 15 days for the installation. Customer has to pay the charges for one/two of our technicians lodging, food & round-trip travelling expenses for the erection, commissioning & installation.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>WARRANTY:</Text> 1 year manufacturing warranty on all mechanical spare parts only. Components like electrical & electronic parts, oil seals are not covered. Warranty is covered in case of any manufacturing defect without any manmade damage.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>SCOPE:</Text> Our scope of Supply is limited to our offer only and not covers the things specifically not mentioned in our offer.
-              </Text>
-            </View>
-
-            <View style={styles.termsContent}>
-              <Text>
-                • <Text style={{ fontWeight: 'bold' }}>VARIATION:</Text> There is variation in requirements of Laboratory items (Glasswares, Chemicals, Equipments etc.) as per BIS to BIS all India. Hence customer must confirm & specify their detailed requirements of Glasswares, Chemicals, and Equipments.
-              </Text>
-            </View>
-          </View>
-
-          <View style={styles.backAndSignature}>
-            <Text style={{ fontWeight: 'bold', textDecoration: 'underline', marginBottom: 10 }}>Please make your remittance to our below bank account:</Text>
-            <View style={styles.bankAndSignatureDetails}>
-              <View>
-                <Text><Text style={{ fontWeight: 'bold' }}>Beneficiary:</Text> VINAYAK INDUSTRIES</Text>
-                <Text><Text style={{ fontWeight: 'bold' }}>Bank name:</Text> INDIAN BANK</Text>
-                <Text><Text style={{ fontWeight: 'bold' }}>Branch name:</Text> GADAKANA, BHUBANESWAR</Text>
-                <Text><Text style={{ fontWeight: 'bold' }}>Account no:</Text> 7658956285</Text>
-                <Text><Text style={{ fontWeight: 'bold' }}>Ifsc Code:</Text> IDIB000G134</Text>
-              </View>
-              <View>
-                <Image src='/vinayak_signature.png' style={styles.signature} />
-              </View>
-            </View>
-            {quotation.validityDate && (
-              <View style={{ marginTop: 85 }}>
-                <Text style={{ fontSize: 10, fontFamily: 'Helvetica-Bold' }}>
-                  Valid Until: {formatDate(quotation.validityDate)}
+        {groupedRows.length > 0 ? (
+          groupedRows.map((group, groupIndex) => (
+            <View key={`${group.category || "uncategorized"}-${groupIndex}`} style={styles.groupedRow}>
+              <View style={[styles.colParticular, styles.categorySpanCell]}>
+                <Text style={[styles.td, styles.categorySpanText]}>
+                  {group.category ? group.category.toUpperCase() : "-"}
                 </Text>
               </View>
-            )}
+              <View style={styles.groupedRight}>
+                {group.rows.map((row, rowIndex) => (
+                  <View
+                    key={`${group.category}-${row.itemName}-${groupIndex}-${rowIndex}`}
+                    style={[
+                      styles.groupedInnerRow,
+                      ...(rowIndex < group.rows.length - 1 ? [styles.groupedInnerRowDivider] : []),
+                    ]}
+                  >
+                    <Text style={[styles.td, styles.colItemInGroup]}>{row.itemName.toUpperCase()}</Text>
+                    <Text style={[styles.td, styles.colNosInGroup]}>{row.nos}</Text>
+                    <Text style={[styles.td, styles.colPriceInGroup]}>{formatAmount(row.price)}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          ))
+        ) : (
+          <View style={styles.tableRow}>
+            <Text style={[styles.td, styles.colParticular]} />
+            <Text style={[styles.td, styles.colItem]}>No items</Text>
+            <Text style={[styles.td, styles.colNos]} />
+            <Text style={[styles.td, styles.colPrice]}>0</Text>
+          </View>
+        )}
+
+        {(quotation.additionalCharges || []).map((charge, index) => (
+          <View key={`${charge.name}-${index}`} style={styles.tableRow}>
+            <Text style={[styles.td, styles.colParticular]} />
+            <Text style={[styles.td, styles.colItem]}>{charge.name}</Text>
+            <Text style={[styles.td, styles.colNos]} />
+            <Text style={[styles.td, styles.colPrice]}>{formatAmount(Number(charge.amount) || 0)}</Text>
+          </View>
+        ))}
+
+        <View style={styles.summary}>
+          <View style={styles.summaryRow}>
+            <Text>Items Total</Text>
+            <Text>{formatAmount(itemsTotal)}</Text>
+          </View>
+          <View style={styles.summaryRow}>
+            <Text>Additional Charges</Text>
+            <Text>{formatAmount(additionalChargesTotal)}</Text>
+          </View>
+          <View style={[styles.summaryRow, styles.summaryLast]}>
+            <Text>Grand Total</Text>
+            <Text>{formatAmount(grandTotal)}</Text>
           </View>
         </View>
+
+        <Text style={[styles.lineText, { textAlign: "right", marginTop:10 }]}>
+          <Text style={styles.inWords}>In Words: {amountInWords(grandTotal)}</Text>
+        </Text>
+
+
+        <Text style={styles.muted}>Validity: {safeDate(quotation.validityDate)}</Text>
       </Page>
     </Document>
   );
 };
 
-// React PDF Service
-export class ReactPDFService {
-  static async generateQuotationPDF(quotation: Quotation, business?: Business) {
-    try {
-      console.log('ReactPDFService: Generating PDF...');
-      const doc = <QuotationDocument quotation={quotation} business={business} />;
-      const blob = await pdf(doc).toBlob();
-      console.log('ReactPDFService: PDF generated successfully');
-      return blob;
-    } catch (error) {
-      console.error('ReactPDFService: Error generating PDF:', error);
-      throw new Error(`React-PDF generation failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
-    }
-  }
-
-  static async downloadQuotationPDF(quotation: Quotation, business?: Business, options: { filename?: string } = {}) {
-    try {
-      console.log('ReactPDFService: Starting PDF download...');
-      const filename = options.filename || `quotation-${quotation.quotationNo || 'VIN-' + Date.now()}.pdf`;
-      const pdfBlob = await this.generateQuotationPDF(quotation, business);
-
-      const url = URL.createObjectURL(pdfBlob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = filename;
-      link.style.display = 'none';
-
-      document.body.appendChild(link);
-      link.click();
-      document.body.removeChild(link);
-
-      URL.revokeObjectURL(url);
-      console.log('ReactPDFService: PDF download completed successfully');
-    } catch (error) {
-      console.error('ReactPDFService: Error downloading PDF:', error);
-      throw error;
-    }
-  }
-
-  static async previewQuotationPDF(quotation: Quotation, business?: Business) {
-    try {
-      const pdfBlob = await this.generateQuotationPDF(quotation, business);
-      return URL.createObjectURL(pdfBlob);
-    } catch (error) {
-      console.error('ReactPDFService: Error generating preview:', error);
-      throw error;
-    }
-  }
-}
-
 export interface ReactPDFOptions {
   filename?: string;
 }
 
-// Unified Preview Component
+export class ReactPDFService {
+  static async generateQuotationPDF(quotation: Quotation, _business?: unknown) {
+    const leadId = quotation.leadId?._id;
+    let lead: Lead | null = null;
+
+    if (leadId) {
+      try {
+        lead = await getLeadByIdApi(leadId);
+      } catch (error) {
+        console.warn("Unable to fetch lead details for quotation PDF:", error);
+      }
+    }
+
+    const doc = <QuotationDocument quotation={quotation} lead={lead} />;
+    return pdf(doc).toBlob();
+  }
+
+  static async downloadQuotationPDF(quotation: Quotation, _business?: unknown, options: ReactPDFOptions = {}) {
+    const filename = options.filename || `quotation-${quotation.quotationNo || Date.now()}.pdf`;
+    const blob = await this.generateQuotationPDF(quotation);
+    const url = URL.createObjectURL(blob);
+
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+
+    URL.revokeObjectURL(url);
+  }
+
+  static async previewQuotationPDF(quotation: Quotation, _business?: unknown) {
+    const blob = await this.generateQuotationPDF(quotation);
+    return URL.createObjectURL(blob);
+  }
+}
+
 interface UnifiedQuotationPreviewProps {
   quotation: Quotation;
-  business?: Business;
+  business?: unknown;
   onDownloadPDF?: () => Promise<void> | void;
   showActions?: boolean;
   className?: string;
 }
 
-export const UnifiedQuotationPreview: React.FC<UnifiedQuotationPreviewProps> = ({
+export const UnifiedQuotationPreview: React.FC<Readonly<UnifiedQuotationPreviewProps>> = ({
   quotation,
   business,
   onDownloadPDF,
   showActions = true,
-  className = '',
+  className = "",
 }) => {
   const { toast } = useToast();
-  const [isGenerating, setIsGenerating] = React.useState(false);
   const [pdfUrl, setPdfUrl] = React.useState<string | null>(null);
-  const [isClient, setIsClient] = React.useState(false);
-  const [pdfError, setPdfError] = React.useState<string | null>(null);
+  const [isGenerating, setIsGenerating] = React.useState(false);
+  const [previewError, setPreviewError] = React.useState<string | null>(null);
 
   React.useEffect(() => {
-    setIsClient(true);
+    let mounted = true;
+    let createdUrl = "";
 
-    const generatePreview = async () => {
+    const loadPreview = async () => {
       try {
-        setPdfError(null);
+        setPreviewError(null);
         const blob = await ReactPDFService.generateQuotationPDF(quotation, business);
-        const url = URL.createObjectURL(blob);
-        setPdfUrl(url);
+        createdUrl = URL.createObjectURL(blob);
+        if (mounted) {
+          setPdfUrl(createdUrl);
+        }
       } catch (error) {
-        console.error('Failed to generate PDF preview:', error);
-        setPdfError(error instanceof Error ? error.message : 'Failed to generate PDF preview');
+        const message = error instanceof Error ? error.message : "Failed to generate preview.";
+        if (mounted) {
+          setPreviewError(message);
+          setPdfUrl(null);
+        }
       }
     };
 
-    generatePreview();
+    void loadPreview();
 
     return () => {
-      if (pdfUrl) URL.revokeObjectURL(pdfUrl);
+      mounted = false;
+      if (createdUrl) {
+        URL.revokeObjectURL(createdUrl);
+      }
     };
   }, [quotation, business]);
 
   const handleDownloadPDF = async () => {
-    if (onDownloadPDF) {
-      await onDownloadPDF();
-      return;
-    }
-
     setIsGenerating(true);
     try {
-      console.log('UnifiedQuotationPreview: Starting PDF download...');
-      await ReactPDFService.downloadQuotationPDF(quotation, business);
-      toast({
-        description: 'PDF downloaded successfully',
-      });
+      if (onDownloadPDF) {
+        await onDownloadPDF();
+      } else {
+        await ReactPDFService.downloadQuotationPDF(quotation, business);
+      }
     } catch (error) {
-      console.error('UnifiedQuotationPreview: PDF download error:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Failed to generate PDF';
+      const message = error instanceof Error ? error.message : "Failed to download PDF.";
       toast({
-        title: 'Error',
-        description: errorMessage,
-        variant: 'destructive',
+        title: "Error",
+        description: message,
+        variant: "destructive",
       });
     } finally {
       setIsGenerating(false);
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
-
-  if (!isClient) {
-    return (
-      <div className={`unified-quotation-preview ${className}`}>
-        <div className="flex justify-center items-center h-96">
-          <div className="text-lg">Loading PDF preview...</div>
-        </div>
-      </div>
-    );
-  }
-
   return (
-    <div className={`unified-quotation-preview ${className}`}>
+    <div className={`space-y-4 ${className}`}>
       {showActions && (
-        <div className="flex justify-end gap-2 mb-4 print:hidden">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handlePrint}
-          >
+        <div className="flex justify-end gap-2 print:hidden">
+          <Button variant="outline" size="sm" onClick={() => window.print()}>
             <Printer className="h-4 w-4 mr-2" />
             Print
           </Button>
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleDownloadPDF}
-            disabled={isGenerating}
-          >
+          <Button variant="outline" size="sm" onClick={handleDownloadPDF} disabled={isGenerating}>
             <Download className="h-4 w-4 mr-2" />
-            {isGenerating ? 'Generating...' : 'Download PDF'}
+            {isGenerating ? "Generating..." : "Download PDF"}
           </Button>
         </div>
       )}
 
-      <div style={{ width: '100%', height: '800px', border: '1px solid #e5e7eb', borderRadius: '8px' }}>
-        {pdfError && (
-          <div className="flex flex-col justify-center items-center h-full p-8 text-center">
-            <div className="text-lg font-semibold text-red-600 mb-2">PDF Preview Error</div>
-            <div className="text-sm text-gray-600 mb-4">{pdfError}</div>
+      <div className="w-full h-[820px] rounded-md border bg-white overflow-hidden">
+        {previewError ? (
+          <div className="h-full flex flex-col items-center justify-center px-6 text-center">
+            <p className="font-medium text-red-600 mb-2">Unable to render preview</p>
+            <p className="text-sm text-muted-foreground mb-4">{previewError}</p>
             <Button
-              onClick={() => {
-                setPdfError(null);
-                setPdfUrl(null);
-                ReactPDFService.generateQuotationPDF(quotation, business)
-                  .then(blob => {
-                    const url = URL.createObjectURL(blob);
-                    setPdfUrl(url);
-                  })
-                  .catch(err => {
-                    setPdfError(err instanceof Error ? err.message : 'Failed to generate PDF');
-                  });
-              }}
               variant="outline"
-              size="sm"
+              onClick={() => {
+                setPdfUrl(null);
+                setPreviewError(null);
+              }}
             >
-              Retry Preview
+              Retry
             </Button>
           </div>
-        )}
-
-        {!pdfError && pdfUrl && (
-          <iframe
-            src={pdfUrl}
-            style={{ width: '100%', height: '100%', border: 'none', borderRadius: '8px' }}
-            title="PDF Preview"
-          />
-        )}
-
-        {!pdfError && !pdfUrl && (
-          <div className="flex justify-center items-center h-full">
-            <div className="text-lg">Generating PDF preview...</div>
-          </div>
+        ) : pdfUrl ? (
+          <iframe src={pdfUrl} className="w-full h-full" title="Quotation PDF Preview" />
+        ) : (
+          <div className="h-full flex items-center justify-center text-muted-foreground">Generating preview...</div>
         )}
       </div>
     </div>

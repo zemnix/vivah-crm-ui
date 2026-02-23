@@ -5,7 +5,7 @@ export interface Customer {
   name: string;
   email?: string;
   mobile: string;
-  dateOfBirth: string; // ISO date string
+  dateOfBirth?: string; // ISO date string
   whatsappNumber: string;
   address: string;
   venueEmail?: string;
