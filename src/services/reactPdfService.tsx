@@ -28,162 +28,239 @@ interface CategoryGroup {
 const styles = StyleSheet.create({
   page: {
     padding: 24,
-    paddingTop: 74,
-    paddingBottom: 74,
-    fontSize: 11,
+    paddingTop: 96,
+    paddingBottom: 64,
+    fontSize: 10.6,
     fontFamily: "Helvetica",
-    color: "#1f2937",
+    color: "#1e293b",
     backgroundColor: "#ffffff",
   },
   watermark: {
     position: "absolute",
     top: 240,
-    left: 50,
-    width: 500,
-    height: 301,
+    left: 95,
+    width: 400,
+    height: 200,
     aspectRatio: 1,
-    opacity: 0.19,
+    opacity: 0.045,
   },
-  banner: {
-    backgroundColor: "#e87f4f",
-    minHeight: 34,
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 0,
-    borderRadius: 2,
-    marginBottom: 14,
-  },
-  bannerFixed: {
+  headerFixed: {
     position: "absolute",
     top: 24,
     left: 24,
     right: 24,
-    backgroundColor: "#e87f4f",
-    minHeight: 34,
+    borderWidth: 1,
+    borderColor: "#d4c2a0",
+    borderRadius: 4,
+    backgroundColor: "#fffcf7",
+  },
+  headerAccent: {
+    height: 3,
+    backgroundColor: "#87612a",
+    borderTopLeftRadius: 3,
+    borderTopRightRadius: 3,
+  },
+  headerContent: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    paddingHorizontal: 10,
-    paddingVertical: 0,
-    borderRadius: 2,
+    paddingHorizontal: 12,
+    paddingVertical: 9,
   },
-  bannerLeft: {
+  brandBlock: {
     flexDirection: "row",
     alignItems: "center",
-    gap: 10,
   },
   logo: {
-    width: 46,
+    width: 72,
     height: 36,
     objectFit: "contain",
+    marginRight: 10,
   },
-  bannerCompany: {
-    color: "#ffffff",
-    fontSize: 13,
+  brandName: {
+    fontSize: 17,
     fontFamily: "Helvetica-Bold",
-    letterSpacing: 0.4,
+    color: "#1f2937",
   },
-  bannerTitle: {
-    color: "#ffffff",
-    fontSize: 25,
-    fontFamily: "Times-Bold",
+  brandSubtitle: {
+    marginTop: 1,
+    fontSize: 9.2,
+    color: "#5b6473",
+    letterSpacing: 0.3,
   },
-  twoCol: {
+  quotationBadge: {
+    alignItems: "flex-end",
+  },
+  quotationBadgeTitle: {
+    fontSize: 8.5,
+    color: "#745622",
+    marginBottom: 2,
+    letterSpacing: 1,
+  },
+  quotationBadgeRef: {
+    borderWidth: 1,
+    borderColor: "#dbc8a2",
+    backgroundColor: "#f8f0df",
+    borderRadius: 3,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    fontSize: 10.4,
+    fontFamily: "Helvetica-Bold",
+    color: "#5a4320",
+  },
+  sectionCard: {
+    borderWidth: 1,
+    borderColor: "#e7e0d1",
+    borderRadius: 4,
+    backgroundColor: "#fffdf8",
+    padding: 12,
+    marginBottom: 12,
+  },
+  sectionRow: {
     flexDirection: "row",
     justifyContent: "space-between",
-    gap: 18,
-    marginBottom: 20,
   },
-  col: {
+  sectionColLeft: {
     flex: 1,
+    marginRight: 12,
   },
-  sectionTitle: {
-    fontSize: 15,
+  sectionColRight: {
+    width: "36%",
+  },
+  sectionHeading: {
+    fontSize: 12.8,
     fontFamily: "Helvetica-Bold",
-    color: "#1f3557",
-    marginBottom: 8,
+    color: "#24334e",
+    marginBottom: 6,
+    letterSpacing: 0.4,
   },
-  lineText: {
+  infoRow: {
+    flexDirection: "row",
     marginBottom: 4,
   },
-  muted: {
-    color: "#4b5563",
-    marginTop: 100
+  infoLabel: {
+    width: "36%",
+    color: "#616b79",
+    fontSize: 9.8,
   },
-  divider: {
-    borderBottomWidth: 1,
-    borderBottomColor: "#d1d5db",
-    marginVertical: 10,
+  infoValue: {
+    width: "64%",
+    color: "#1f2937",
+    fontSize: 9.8,
+    fontFamily: "Helvetica-Bold",
+  },
+  lineText: {
+    marginBottom: 3,
+    color: "#374151",
+    fontSize: 9.8,
+  },
+  labelText: {
+    fontSize: 8.8,
+    color: "#687180",
+    marginBottom: 2,
+    letterSpacing: 0.4,
+  },
+  valueText: {
+    fontSize: 10.2,
+    color: "#1f2937",
+    marginBottom: 3,
+  },
+  valueEmphasis: {
+    fontFamily: "Helvetica-Bold",
+  },
+  eventList: {
+    marginTop: 2,
+  },
+  eventRow: {
+    flexDirection: "row",
+    borderWidth: 1,
+    borderColor: "#e5dfd2",
+    borderRadius: 3,
+    backgroundColor: "#ffffff",
+    paddingVertical: 8,
+    paddingHorizontal: 8,
+    marginBottom: 6,
+  },
+  eventIndex: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: "#cfbf97",
+    borderRadius: 10,
+    textAlign: "center",
+    fontSize: 9.2,
+    color: "#735422",
+    marginRight: 8,
+    paddingTop: 3,
   },
   eventCard: {
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 3,
-    padding: 8,
-    marginBottom: 8,
-    backgroundColor: "#f8fafc",
+    flex: 1,
   },
   eventHeading: {
     fontFamily: "Helvetica-Bold",
-    marginBottom: 4,
+    marginBottom: 2,
+    color: "#25324f",
+    fontSize: 10.2,
   },
-  commentsTitle: {
-    fontSize: 13,
+  eventMeta: {
+    fontSize: 9.3,
+    color: "#515b69",
+    marginBottom: 1,
+  },
+  itemsTitle: {
+    fontSize: 12.8,
     fontFamily: "Helvetica-Bold",
-    color: "#1f3557",
+    color: "#24334e",
     marginBottom: 6,
-  },
-  commentsText: {
-    minHeight: 42,
-    borderWidth: 1,
-    borderColor: "#d1d5db",
-    borderRadius: 3,
-    padding: 8,
-    backgroundColor: "#fafafa",
+    letterSpacing: 0.4,
   },
   tableHeaderRow: {
     flexDirection: "row",
-    backgroundColor: "#556b95",
+    backgroundColor: "#2f3f63",
     color: "#ffffff",
     borderWidth: 1,
-    borderColor: "#94a3b8",
+    borderColor: "#2a3a5b",
+    borderRadius: 3,
   },
   tableRow: {
     flexDirection: "row",
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
     minHeight: 28,
+  },
+  tableRowAlt: {
+    backgroundColor: "#fbfdff",
   },
   th: {
     fontFamily: "Helvetica-Bold",
-    paddingVertical: 7,
+    paddingVertical: 7.5,
     paddingHorizontal: 6,
     textAlign: "center",
-    fontSize: 11,
+    fontSize: 10.2,
+    letterSpacing: 0.4,
   },
   td: {
-    paddingVertical: 6,
+    paddingVertical: 6.2,
     paddingHorizontal: 6,
-    fontSize: 10.5,
+    fontSize: 9.7,
+    color: "#253247",
   },
   colParticular: {
     width: "32%",
     borderRightWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
   },
   colItem: {
     width: "32%",
     borderRightWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
   },
   colNos: {
     width: "16%",
     borderRightWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
     textAlign: "center",
   },
   colPrice: {
@@ -195,15 +272,21 @@ const styles = StyleSheet.create({
     borderLeftWidth: 1,
     borderRightWidth: 1,
     borderBottomWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
   },
   categorySpanCell: {
     justifyContent: "center",
     alignItems: "center",
+    backgroundColor: "#f9f3e7",
+    borderRightWidth: 1,
+    borderColor: "#d5dcea",
   },
   categorySpanText: {
     textAlign: "center",
     width: "100%",
+    fontFamily: "Helvetica-Bold",
+    fontSize: 9.4,
+    color: "#6a4f23",
   },
   groupedRight: {
     width: "68%",
@@ -212,57 +295,101 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     minHeight: 28,
   },
+  groupedInnerRowAlt: {
+    backgroundColor: "#fbfdff",
+  },
   groupedInnerRowDivider: {
     borderBottomWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
   },
   colItemInGroup: {
     width: "47.0588%",
     borderRightWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
   },
   colNosInGroup: {
     width: "23.5294%",
     borderRightWidth: 1,
-    borderColor: "#cbd5e1",
+    borderColor: "#d5dcea",
     textAlign: "center",
   },
   colPriceInGroup: {
     width: "29.4118%",
     textAlign: "right",
   },
-  summary: {
+  summaryCard: {
     marginTop: 12,
     alignSelf: "flex-end",
-    width: "45%",
-    borderWidth: 1,
-    borderColor: "#cbd5e1",
+    width: "47%",
+    borderWidth: 1.2,
+    borderColor: "#cbb68a",
+    borderRadius: 4,
+    backgroundColor: "#fffdfa",
+  },
+  summaryHeader: {
+    paddingHorizontal: 9,
+    paddingVertical: 6,
+    borderBottomWidth: 1,
+    borderColor: "#e6ddca",
+    backgroundColor: "#f8f2e5",
+    color: "#644920",
+    fontSize: 9.4,
+    fontFamily: "Helvetica-Bold",
+    letterSpacing: 0.5,
   },
   summaryRow: {
     flexDirection: "row",
     justifyContent: "space-between",
     borderBottomWidth: 1,
-    borderColor: "#e2e8f0",
+    borderColor: "#ece6d8",
     paddingVertical: 6,
-    paddingHorizontal: 8,
+    paddingHorizontal: 9,
   },
-  summaryLast: {
-    backgroundColor: "#ecf2ff",
+  summaryLabel: {
+    fontSize: 9.8,
+    color: "#374151",
+  },
+  summaryValue: {
+    fontSize: 9.8,
+    color: "#111827",
     fontFamily: "Helvetica-Bold",
   },
-  inWords: {
-    marginTop: 10,
+  summaryGrand: {
+    borderBottomWidth: 0,
+    backgroundColor: "#f4ece0",
+    paddingVertical: 7,
+  },
+  summaryGrandText: {
     fontSize: 10.5,
+    fontFamily: "Helvetica-Bold",
+    color: "#5c4320",
+  },
+  finalNotes: {
+    marginTop: 12,
+    borderTopWidth: 1,
+    borderColor: "#dfd7c4",
+    paddingTop: 8,
+  },
+  amountWords: {
+    fontSize: 9.8,
+    color: "#24334e",
+    marginBottom: 4,
+  },
+  validityText: {
+    fontSize: 9.5,
+    color: "#5f6b7d",
   },
   pageFooter: {
     position: "absolute",
     left: 24,
     right: 24,
     bottom: 20,
+    borderTopWidth: 1,
+    borderColor: "#e5e7eb",
     paddingTop: 4,
     textAlign: "right",
-    fontSize: 9.5,
-    color: "#6b7280",
+    fontSize: 8.9,
+    color: "#7b8594",
   },
 });
 
@@ -365,59 +492,77 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
           fixed
           render={({ pageNumber, totalPages }) => `Page ${pageNumber} of ${totalPages}`}
         />
-        <View style={styles.bannerFixed} fixed>
-          <View style={styles.bannerLeft}>
-            <Image src="/vivah-creations-logo.png" style={styles.logo} />
-          </View>
-          <Text style={styles.bannerTitle}>Quotation</Text>
-        </View>
-
-        <View style={styles.twoCol}>
-          <View style={styles.col}>
-            <Text style={styles.sectionTitle}>Company Address</Text>
-            <Text style={styles.lineText}>VIVAH CREATIONS</Text>
-            <Text style={styles.lineText}>SATYA VIHAR, BBSR</Text>
-            <Text style={styles.lineText}>MOB-7205946778 / 9777144463</Text>
-            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Quotation For</Text>
-            <Text style={styles.lineText}>{quotation.customer?.name || "N/A"}</Text>
-            <Text style={styles.lineText}>{quotation.customer?.mobile || "N/A"}</Text>
-            <Text style={styles.lineText}>{quotation.customer?.address || "N/A"}</Text>
-          </View>
-          <View style={styles.col}>
-            <Text style={[styles.sectionTitle, { textAlign: "right" }]}>Quotation Details</Text>
-            <Text style={[styles.lineText, { textAlign: "right" }]}>
-              <Text style={styles.muted}>Ref No:</Text> {quotation.quotationNo || "N/A"}
-            </Text>
-            <Text style={[styles.lineText, { textAlign: "right" }]}>
-              <Text style={styles.muted}>Date:</Text> {safeDate(quotation.date || quotation.createdAt)}
-            </Text>
-          </View>
-        </View>
-
-        <Text style={styles.sectionTitle}>Event Details</Text>
-        {lead?.typesOfEvent?.length ? (
-          lead.typesOfEvent.map((event, index) => (
-            <View key={`${event.name}-${event.date}-${index}`} style={styles.eventCard}>
-              <Text style={styles.eventHeading}>{event.name}</Text>
-              <Text>Date: {safeDate(event.date)}</Text>
-              <Text>Day/Night: {event.dayNight}</Text>
+        <View style={styles.headerFixed} fixed>
+          <View style={styles.headerAccent} />
+          <View style={styles.headerContent}>
+            <View style={styles.brandBlock}>
+              <Image src="/vivah-creations-logo.png" style={styles.logo} />
+              
             </View>
-          ))
-        ) : (
-          <View style={styles.eventCard}>
-            <Text >No event details available.</Text>
+            <View>
+                <Text style={styles.brandName}>Vivah Creations</Text>
+                {/* <Text style={styles.brandSubtitle}>EVENT MANAGEMENT QUOTATION</Text> */}
+              </View>
           </View>
-        )}
+        </View>
 
-        <Text style={{marginTop: 10}} ></Text>
+        <View style={styles.sectionCard}>
+          <View style={styles.sectionRow}>
+            <View style={styles.sectionColLeft}>
+              <Text style={styles.sectionHeading}>Company Address</Text>
+              <Text style={styles.lineText}>VIVAH CREATIONS</Text>
+              <Text style={styles.lineText}>SATYA VIHAR, BBSR</Text>
+              <Text style={styles.lineText}>MOB - 7205946778 / 9777144463</Text>
+              <Text style={[styles.sectionHeading, { marginTop: 9 }]}>Quotation For</Text>
+              <Text style={[styles.valueText, styles.valueEmphasis]}>{quotation.customer?.name || "N/A"}</Text>
+              <Text style={styles.valueText}>{quotation.customer?.mobile || "N/A"}</Text>
+              <Text style={styles.valueText}>{quotation.customer?.address || "N/A"}</Text>
+            </View>
+            <View style={styles.sectionColRight}>
+              <Text style={styles.sectionHeading}>Quotation Details</Text>
+              <Text style={styles.labelText}>Reference No.</Text>
+              <Text style={[styles.valueText, styles.valueEmphasis]}>{quotation.quotationNo || "N/A"}</Text>
+              <Text style={styles.labelText}>Date</Text>
+              <Text style={styles.valueText}>{safeDate(quotation.date || quotation.createdAt)}</Text>
+              <Text style={styles.labelText}>Prepared By</Text>
+              <Text style={styles.valueText}>Vivah Creations Team</Text>
+            </View>
+          </View>
+        </View>
 
-        <Text style={styles.sectionTitle}>Items</Text>
+        <View style={styles.sectionCard}>
+          <Text style={styles.sectionHeading}>Event Details</Text>
+          <View style={styles.eventList}>
+            {lead?.typesOfEvent?.length ? (
+              lead.typesOfEvent.map((event, index) => (
+                <View key={`${event.name}-${event.date}-${index}`} style={styles.eventRow}>
+                  <Text style={styles.eventIndex}>{index + 1}</Text>
+                  <View style={styles.eventCard}>
+                    <Text style={styles.eventHeading}>{event.name}</Text>
+                    <Text style={styles.eventMeta}>Date: {safeDate(event.date)}</Text>
+                    <Text style={styles.eventMeta}>Session: {event.dayNight || "N/A"}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <View style={styles.eventRow}>
+                <Text style={styles.eventIndex}>1</Text>
+                <View style={styles.eventCard}>
+                  <Text style={styles.eventHeading}>No event details available</Text>
+                  <Text style={styles.eventMeta}>Please confirm event schedule.</Text>
+                </View>
+              </View>
+            )}
+          </View>
+        </View>
+
+        <Text style={styles.itemsTitle}>Items & Services</Text>
 
         <View style={styles.tableHeaderRow}>
           <Text style={[styles.th, styles.colParticular]}>PARTICULARS</Text>
-          <Text style={[styles.th, styles.colItem]}>Item</Text>
+          <Text style={[styles.th, styles.colItem]}>ITEM</Text>
           <Text style={[styles.th, styles.colNos]}>NOS</Text>
-          <Text style={[styles.th, styles.colPrice]}>Amount</Text>
+          <Text style={[styles.th, styles.colPrice]}>AMOUNT</Text>
         </View>
 
         {groupedRows.length > 0 ? (
@@ -434,11 +579,12 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
                     key={`${group.category}-${row.itemName}-${groupIndex}-${rowIndex}`}
                     style={[
                       styles.groupedInnerRow,
+                      ...(rowIndex % 2 === 1 ? [styles.groupedInnerRowAlt] : []),
                       ...(rowIndex < group.rows.length - 1 ? [styles.groupedInnerRowDivider] : []),
                     ]}
                   >
                     <Text style={[styles.td, styles.colItemInGroup]}>{row.itemName.toUpperCase()}</Text>
-                    <Text style={[styles.td, styles.colNosInGroup]}>{row.nos}</Text>
+                    <Text style={[styles.td, styles.colNosInGroup]}>{row.nos || "-"}</Text>
                     <Text style={[styles.td, styles.colPriceInGroup]}>{formatAmount(row.price)}</Text>
                   </View>
                 ))}
@@ -449,41 +595,41 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
           <View style={styles.tableRow}>
             <Text style={[styles.td, styles.colParticular]} />
             <Text style={[styles.td, styles.colItem]}>No items</Text>
-            <Text style={[styles.td, styles.colNos]} />
+            <Text style={[styles.td, styles.colNos]}>-</Text>
             <Text style={[styles.td, styles.colPrice]}>0</Text>
           </View>
         )}
 
         {(quotation.additionalCharges || []).map((charge, index) => (
-          <View key={`${charge.name}-${index}`} style={styles.tableRow}>
+          <View key={`${charge.name}-${index}`} style={[styles.tableRow, ...(index % 2 === 0 ? [styles.tableRowAlt] : [])]}>
             <Text style={[styles.td, styles.colParticular]} />
             <Text style={[styles.td, styles.colItem]}>{charge.name}</Text>
-            <Text style={[styles.td, styles.colNos]} />
+            <Text style={[styles.td, styles.colNos]}>-</Text>
             <Text style={[styles.td, styles.colPrice]}>{formatAmount(Number(charge.amount) || 0)}</Text>
           </View>
         ))}
 
-        <View style={styles.summary}>
+        <View style={styles.summaryCard}>
+          <Text style={styles.summaryHeader}>SUMMARY</Text>
           <View style={styles.summaryRow}>
-            <Text>Items Total</Text>
-            <Text>{formatAmount(itemsTotal)}</Text>
+            <Text style={styles.summaryLabel}>Items Total</Text>
+            <Text style={styles.summaryValue}>{formatAmount(itemsTotal)}</Text>
           </View>
           <View style={styles.summaryRow}>
-            <Text>Additional Charges</Text>
-            <Text>{formatAmount(additionalChargesTotal)}</Text>
+            <Text style={styles.summaryLabel}>Additional Charges</Text>
+            <Text style={styles.summaryValue}>{formatAmount(additionalChargesTotal)}</Text>
           </View>
-          <View style={[styles.summaryRow, styles.summaryLast]}>
-            <Text>Grand Total</Text>
-            <Text>{formatAmount(grandTotal)}</Text>
+          <View style={[styles.summaryRow, styles.summaryGrand]}>
+            <Text style={styles.summaryGrandText}>Grand Total</Text>
+            <Text style={styles.summaryGrandText}>{formatAmount(grandTotal)}</Text>
           </View>
         </View>
 
-        <Text style={[styles.lineText, { textAlign: "right", marginTop:10 }]}>
-          <Text style={styles.inWords}>In Words: {amountInWords(grandTotal)}</Text>
-        </Text>
-
-
-        <Text style={styles.muted}>Validity: {safeDate(quotation.validityDate)}</Text>
+        <View style={styles.finalNotes}>
+          <Text style={styles.amountWords}>In Words: {amountInWords(grandTotal)}</Text>
+          <Text style={styles.validityText}>Validity: {safeDate(quotation.validityDate)}</Text>
+          {quotation.notes ? <Text style={[styles.validityText, { marginTop: 3 }]}>Note: {quotation.notes}</Text> : null}
+        </View>
       </Page>
     </Document>
   );
