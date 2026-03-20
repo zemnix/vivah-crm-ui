@@ -29,7 +29,7 @@ const createConvertEnquirySchema = () => {
     typesOfEvent: z.array(
       z.object({
         name: z.string().min(1, "Event name is required"), // Read-only from enquiry
-        date: z.string().min(1, "Event date is required"), // Editable
+        date: z.string().optional().or(z.literal("")), // Editable
         dayNight: z.enum(['day', 'night', 'both']), // Editable
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"), // Read-only from enquiry
       })
@@ -89,7 +89,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
         assignedTo: undefined,
         typesOfEvent: enquiry.typesOfEvent.map(event => ({
           name: event.name, // From enquiry - read-only
-          date: new Date().toISOString().split('T')[0], // Default to today - editable
+          date: "", // Optional
           dayNight: 'both' as const, // Default - editable
           numberOfGuests: event.numberOfGuests, // From enquiry - read-only
         })),
@@ -160,7 +160,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
         assignedTo: data.assignedTo || undefined,
         typesOfEvent: data.typesOfEvent.map(event => ({
           name: event.name, // Backend will use enquiry's value, but we send it for matching
-          date: new Date(event.date + 'T00:00:00').toISOString(),
+          ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
           dayNight: event.dayNight,
           numberOfGuests: event.numberOfGuests, // Backend will use enquiry's value, but we send it for matching
         })),
@@ -334,7 +334,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                       name={`typesOfEvent.${index}.date`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Event Date *</FormLabel>
+                          <FormLabel>Event Date</FormLabel>
                           <FormControl>
                             <DatePicker
                               date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
@@ -386,60 +386,17 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
             </div>
 
             {/* SFX Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const currentSfx = form.getValues("sfx") || [];
-                    form.setValue("sfx", [
-                      ...currentSfx,
-                      {
-                        name: "",
-                        quantity: "",
-                      },
-                    ]);
-                  }}
-                  disabled={isSubmitting || loading || sfxLoading}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add SFX
-                </Button>
-              </div>
-
-              {form.watch("sfx")?.map((_sfx, index) => (
-                <Card key={index} className="p-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <h4 className="font-medium text-sm">SFX {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const currentSfx = form.getValues("sfx") || [];
-                        form.setValue(
-                          "sfx",
-                          currentSfx.filter((_, i) => i !== index)
-                        );
-                      }}
-                      disabled={isSubmitting || loading}
-                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* SFX Name - Dropdown from SFX Config */}
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
+              <Card className="p-2.5 space-y-1">
+                {form.watch("sfx")?.map((_sfx, index) => (
+                  <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-1.5 items-end">
                     <FormField
                       control={form.control}
                       name={`sfx.${index}.name`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>SFX Name *</FormLabel>
+                          {index === 0 && <FormLabel>SFX Name *</FormLabel>}
                           <Select
                             onValueChange={field.onChange}
                             value={field.value || ""}
@@ -463,13 +420,12 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                       )}
                     />
 
-                    {/* Quantity */}
                     <FormField
                       control={form.control}
                       name={`sfx.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantity *</FormLabel>
+                          {index === 0 && <FormLabel>Quantity *</FormLabel>}
                           <FormControl>
                             <Input
                               type="text"
@@ -483,72 +439,70 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                         </FormItem>
                       )}
                     />
-                  </div>
-                </Card>
-              ))}
 
-              {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
-                <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
-                  No SFX added. Click "Add SFX" to add special effects.
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentSfx = form.getValues("sfx") || [];
+                          form.setValue(
+                            "sfx",
+                            currentSfx.filter((_, i) => i !== index)
+                          );
+                        }}
+                        disabled={isSubmitting || loading}
+                        className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="pt-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentSfx = form.getValues("sfx") || [];
+                      form.setValue("sfx", [
+                        ...currentSfx,
+                        {
+                          name: "",
+                          quantity: "",
+                        },
+                      ]);
+                    }}
+                    disabled={isSubmitting || loading || sfxLoading}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add SFX
+                  </Button>
                 </div>
-              )}
+
+                {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
+                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                    No SFX added. Click "Add SFX" to add special effects.
+                  </div>
+                )}
+              </Card>
             </div>
 
             {/* Baraat Section */}
-            <div className="space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-lg font-semibold">Baraat</h3>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => {
-                    const currentBaraat = form.getValues("baraat") || [];
-                    form.setValue("baraat", [
-                      ...currentBaraat,
-                      {
-                        name: "",
-                        quantity: "",
-                      },
-                    ]);
-                  }}
-                  disabled={isSubmitting || loading || baraatFieldsLoading}
-                >
-                  <Plus className="h-4 w-4 mr-1" />
-                  Add Baraat
-                </Button>
-              </div>
-
-              {form.watch("baraat")?.map((_baraat, index) => (
-                <Card key={index} className="p-4">
-                  <div className="flex items-start justify-between mb-4">
-                    <h4 className="font-medium text-sm">Baraat {index + 1}</h4>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="sm"
-                      onClick={() => {
-                        const currentBaraat = form.getValues("baraat") || [];
-                        form.setValue(
-                          "baraat",
-                          currentBaraat.filter((_, i) => i !== index)
-                        );
-                      }}
-                      disabled={isSubmitting || loading}
-                      className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                    {/* Baraat Name - Dropdown from Baraat Config */}
+            <div className="space-y-1">
+              <h3 className="text-lg font-semibold">Baraat</h3>
+              <Card className="p-2.5 space-y-1">
+                {form.watch("baraat")?.map((_baraat, index) => (
+                  <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-1.5 items-end">
                     <FormField
                       control={form.control}
                       name={`baraat.${index}.name`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Baraat Name *</FormLabel>
+                          {index === 0 && <FormLabel>Baraat Name *</FormLabel>}
                           <Select
                             onValueChange={field.onChange}
                             value={field.value || ""}
@@ -572,13 +526,12 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                       )}
                     />
 
-                    {/* Quantity */}
                     <FormField
                       control={form.control}
                       name={`baraat.${index}.quantity`}
                       render={({ field }) => (
                         <FormItem>
-                          <FormLabel>Quantity *</FormLabel>
+                          {index === 0 && <FormLabel>Quantity *</FormLabel>}
                           <FormControl>
                             <Input
                               type="text"
@@ -592,15 +545,56 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                         </FormItem>
                       )}
                     />
-                  </div>
-                </Card>
-              ))}
 
-              {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
-                <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
-                  No baraat added. Click "Add Baraat" to add baraat details.
+                    <div className="flex items-end">
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                          const currentBaraat = form.getValues("baraat") || [];
+                          form.setValue(
+                            "baraat",
+                            currentBaraat.filter((_, i) => i !== index)
+                          );
+                        }}
+                        disabled={isSubmitting || loading}
+                        className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                      >
+                        <X className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+
+                <div className="pt-0">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    onClick={() => {
+                      const currentBaraat = form.getValues("baraat") || [];
+                      form.setValue("baraat", [
+                        ...currentBaraat,
+                        {
+                          name: "",
+                          quantity: "",
+                        },
+                      ]);
+                    }}
+                    disabled={isSubmitting || loading || baraatFieldsLoading}
+                  >
+                    <Plus className="h-4 w-4 mr-1" />
+                    Add Baraat
+                  </Button>
                 </div>
-              )}
+
+                {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
+                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                    No baraat added. Click "Add Baraat" to add baraat details.
+                  </div>
+                )}
+              </Card>
             </div>
 
             {/* Form Actions */}
@@ -624,4 +618,3 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
     </Dialog>
   );
 }
-

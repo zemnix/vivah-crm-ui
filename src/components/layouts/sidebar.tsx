@@ -13,7 +13,6 @@ import {
   X,
   ChevronLeft,
   ChevronRight,
-  ClipboardList,
   CheckCircle
 } from "lucide-react";
 
@@ -35,7 +34,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
     { href: "/admin/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/admin/leads", icon: Users, label: "Leads" },
     { href: "/admin/converted-leads", icon: Users, label: "Converted Leads" },
-    { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
+    // { href: "/admin/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/admin/interactions", icon: MessageSquare, label: "Calls & Meetings" },
     { href: "/admin/quotations", icon: FileText, label: "Quotations" },
     { href: "/admin/master-config", icon: Settings, label: "Master Config" },
@@ -48,7 +47,7 @@ export function Sidebar({ onClose, collapsed = false, onToggleCollapse }: Sideba
     { href: "/staff/dashboard", icon: LayoutDashboard, label: "Dashboard" },
     { href: "/staff/leads", icon: Users, label: "My Leads" },
     { href: "/staff/converted-leads", icon: Users, label: "Converted Leads" },
-    { href: "/staff/enquiries", icon: ClipboardList, label: "Enquiries" },
+    // { href: "/staff/enquiries", icon: ClipboardList, label: "Enquiries" },
     { href: "/staff/interactions", icon: MessageSquare, label: "Calls & Meetings" },
     { href: "/staff/quotations", icon: FileText, label: "Quotations" },
   ];

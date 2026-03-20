@@ -25,7 +25,7 @@ export interface Sfx {
   quantity: string;
 }
 
-export type LeadSource = 'others' | 'reference';
+export type LeadSource = string;
 
 // Lead types based on backend model
 export interface Lead {
@@ -36,6 +36,8 @@ export interface Lead {
   baraatDetails?: Record<string, string | number | null>; // Map of field keys to values
   status: LeadStatus;
   source?: LeadSource;
+  referenceDetails?: string;
+  remark?: string;
   createdBy: {
     _id: string;
     name: string;
@@ -62,21 +64,25 @@ export type LeadStatus =
 
 export interface LeadCreateData {
   customer: Customer;
-  typesOfEvent?: TypeOfEvent[];
+  typesOfEvent?: Array<Omit<TypeOfEvent, 'date'> & { date?: string }>;
   sfx?: Record<string, string | number | null>;
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   source?: LeadSource;
+  referenceDetails?: string;
+  remark?: string;
   assignedTo?: string;
 }
 
 export interface LeadUpdateData {
   customer?: Partial<Customer>;
-  typesOfEvent?: TypeOfEvent[];
+  typesOfEvent?: Array<Omit<TypeOfEvent, 'date'> & { date?: string }>;
   sfx?: Record<string, string | number | null>;
   baraatDetails?: Record<string, string | number | null>;
   status?: LeadStatus;
   source?: LeadSource;
+  referenceDetails?: string;
+  remark?: string;
   assignedTo?: string;
 }
 

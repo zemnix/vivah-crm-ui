@@ -15,6 +15,7 @@ import { useUserStore } from "@/store/admin/userStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { useEventConfigStore } from "@/store/eventConfigStore";
 import { useSfxConfigStore } from "@/store/sfxConfigStore";
+import { useSourceStore } from "@/store/sourceStore";
 import type { Lead, LeadCreateData, LeadUpdateData } from "@/api/leadApi";
 import { useEffect, useState, useMemo } from "react";
 import { Loader, Plus, X } from "lucide-react";
@@ -35,12 +36,14 @@ const createLeadSchema = () => {
   return z.object({
     customer: customerSchema,
     status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const),
-    source: z.enum(['others', 'reference'] as const).optional(),
+    source: z.string().min(1, "Source is required").optional().or(z.literal("")),
+    referenceDetails: z.string().max(500, "Reference details must be less than 500 characters").optional().or(z.literal("")),
+    remark: z.string().max(2000, "Remark must be less than 2000 characters").optional().or(z.literal("")),
     assignedTo: z.string().optional(),
     typesOfEvent: z.array(
       z.object({
         name: z.string().min(1, "Event name is required"),
-        date: z.string().min(1, "Event date is required"),
+        date: z.string().optional().or(z.literal("")),
         dayNight: z.enum(['day', 'night', 'both']),
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
       })
@@ -76,6 +79,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
   const { fields: baraatFields, fetchAllFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
   const { events, fetchAllEvents, loading: eventsLoading } = useEventConfigStore();
   const { sfxConfigs, fetchAllSfxConfigs, loading: sfxLoading } = useSfxConfigStore();
+  const { sources, fetchSources, loading: sourcesLoading } = useSourceStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Sort baraat fields by name
@@ -159,7 +163,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           venueEmail: lead.customer?.venueEmail || "",
         },
         status: lead.status || 'new',
-        source: lead.source || 'others',
+        source: lead.source || undefined,
+        referenceDetails: lead.referenceDetails || "",
+        remark: lead.remark || "",
         assignedTo: lead.assignedTo?._id || undefined,
         typesOfEvent: typesOfEvent.length > 0 ? typesOfEvent : undefined,
         sfx: sfxArray.length > 0 ? sfxArray : undefined,
@@ -180,7 +186,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         venueEmail: "",
       },
       status: 'new',
-      source: 'others',
+      source: undefined,
+      referenceDetails: "",
+      remark: "",
       assignedTo: undefined,
       typesOfEvent: undefined,
       baraat: undefined,
@@ -207,8 +215,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
       fetchAllFields();
       fetchAllEvents();
       fetchAllSfxConfigs();
+      fetchSources();
     }
-  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents, fetchAllSfxConfigs]);
+  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents, fetchAllSfxConfigs, fetchSources]);
 
   const onSubmit = async (data: LeadForm) => {
     if (!user) return;
@@ -240,7 +249,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
       // Prepare typesOfEvent - convert dates to ISO strings
       const typesOfEventData = data.typesOfEvent?.map(event => ({
         name: event.name,
-        date: new Date(event.date + 'T00:00:00').toISOString(),
+        ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
         dayNight: event.dayNight,
         numberOfGuests: event.numberOfGuests,
       }));
@@ -272,7 +281,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           sfx: Object.keys(sfxData).length > 0 ? sfxData : undefined,
           baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
           status: data.status,
-          source: data.source || 'others',
+          source: data.source || undefined,
+          referenceDetails: data.referenceDetails?.trim() || undefined,
+          remark: data.remark?.trim() || undefined,
           ...(user.role === 'staff' 
             ? { assignedTo: user.id } 
             : data.assignedTo && { assignedTo: data.assignedTo }
@@ -294,7 +305,9 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           sfx: Object.keys(sfxData).length > 0 ? sfxData : undefined,
           baraatDetails: Object.keys(baraatDetailsData).length > 0 ? baraatDetailsData : undefined,
           status: data.status,
-          source: data.source || 'others',
+          source: data.source || undefined,
+          referenceDetails: data.referenceDetails?.trim() || undefined,
+          remark: data.remark?.trim() || undefined,
           ...(user.role === 'staff' 
             ? {} 
             : data.assignedTo !== undefined && { assignedTo: data.assignedTo }
@@ -320,7 +333,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
     }
   };
 
-  const isPending = loading || isSubmitting || baraatFieldsLoading || eventsLoading || sfxLoading;
+  const isPending = loading || isSubmitting || baraatFieldsLoading || eventsLoading || sfxLoading || sourcesLoading;
 
 
   return (
@@ -565,7 +578,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                         name={`typesOfEvent.${index}.date`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Event Date *</FormLabel>
+                            <FormLabel>Event Date</FormLabel>
                             <FormControl>
                               <DatePicker
                                 date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
@@ -653,60 +666,17 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
               </div>
 
               {/* SFX Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const currentSfx = form.getValues("sfx") || [];
-                      form.setValue("sfx", [
-                        ...currentSfx,
-                        {
-                          name: "",
-                          quantity: "",
-                        },
-                      ]);
-                    }}
-                    disabled={isSubmitting || loading || sfxLoading}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add SFX
-                  </Button>
-                </div>
-
-                {form.watch("sfx")?.map((_sfx, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="flex items-start justify-between mb-4">
-                      <h4 className="font-medium text-sm">SFX {index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const currentSfx = form.getValues("sfx") || [];
-                          form.setValue(
-                            "sfx",
-                            currentSfx.filter((_, i) => i !== index)
-                          );
-                        }}
-                        disabled={isSubmitting || loading}
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* SFX Name - Dropdown from SFX Config */}
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">SFX (Special Effects)</h3>
+                <Card className="p-2.5 space-y-1">
+                  {form.watch("sfx")?.map((_sfx, index) => (
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-1.5 items-end">
                       <FormField
                         control={form.control}
                         name={`sfx.${index}.name`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>SFX Name *</FormLabel>
+                            {index === 0 && <FormLabel>SFX Name *</FormLabel>}
                             <Select
                               onValueChange={field.onChange}
                               value={field.value || ""}
@@ -730,13 +700,12 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                         )}
                       />
 
-                      {/* Quantity */}
                       <FormField
                         control={form.control}
                         name={`sfx.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity *</FormLabel>
+                            {index === 0 && <FormLabel>Quantity *</FormLabel>}
                             <FormControl>
                               <Input
                                 type="text"
@@ -750,72 +719,70 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                           </FormItem>
                         )}
                       />
-                    </div>
-                  </Card>
-                ))}
 
-                {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
-                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
-                    No SFX added. Click "Add SFX" to add special effects.
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentSfx = form.getValues("sfx") || [];
+                            form.setValue(
+                              "sfx",
+                              currentSfx.filter((_, i) => i !== index)
+                            );
+                          }}
+                          disabled={isSubmitting || loading}
+                          className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentSfx = form.getValues("sfx") || [];
+                        form.setValue("sfx", [
+                          ...currentSfx,
+                          {
+                            name: "",
+                            quantity: "",
+                          },
+                        ]);
+                      }}
+                      disabled={isSubmitting || loading || sfxLoading}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add SFX
+                    </Button>
                   </div>
-                )}
+
+                  {(!form.watch("sfx") || form.watch("sfx")?.length === 0) && (
+                    <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                      No SFX added. Click "Add SFX" to add special effects.
+                    </div>
+                  )}
+                </Card>
               </div>
 
               {/* Baraat Section */}
-              <div className="space-y-4">
-                <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-semibold">Baraat</h3>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      const currentBaraat = form.getValues("baraat") || [];
-                      form.setValue("baraat", [
-                        ...currentBaraat,
-                        {
-                          name: "",
-                          quantity: "",
-                        },
-                      ]);
-                    }}
-                    disabled={isSubmitting || loading || baraatFieldsLoading}
-                  >
-                    <Plus className="h-4 w-4 mr-1" />
-                    Add Baraat
-                  </Button>
-                </div>
-
-                {form.watch("baraat")?.map((_baraat, index) => (
-                  <Card key={index} className="p-4">
-                    <div className="flex items-start justify-between mb-4">
-                      <h4 className="font-medium text-sm">Baraat {index + 1}</h4>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => {
-                          const currentBaraat = form.getValues("baraat") || [];
-                          form.setValue(
-                            "baraat",
-                            currentBaraat.filter((_, i) => i !== index)
-                          );
-                        }}
-                        disabled={isSubmitting || loading}
-                        className="h-6 w-6 p-0 text-destructive hover:text-destructive"
-                      >
-                        <X className="h-4 w-4" />
-                      </Button>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                      {/* Baraat Name - Dropdown from Baraat Config */}
+              <div className="space-y-1">
+                <h3 className="text-lg font-semibold">Baraat</h3>
+                <Card className="p-2.5 space-y-1">
+                  {form.watch("baraat")?.map((_baraat, index) => (
+                    <div key={index} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-1.5 items-end">
                       <FormField
                         control={form.control}
                         name={`baraat.${index}.name`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Baraat Name *</FormLabel>
+                            {index === 0 && <FormLabel>Baraat Name *</FormLabel>}
                             <Select
                               onValueChange={field.onChange}
                               value={field.value || ""}
@@ -839,13 +806,12 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                         )}
                       />
 
-                      {/* Quantity */}
                       <FormField
                         control={form.control}
                         name={`baraat.${index}.quantity`}
                         render={({ field }) => (
                           <FormItem>
-                            <FormLabel>Quantity *</FormLabel>
+                            {index === 0 && <FormLabel>Quantity *</FormLabel>}
                             <FormControl>
                               <Input
                                 type="text"
@@ -859,15 +825,56 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                           </FormItem>
                         )}
                       />
-                    </div>
-                  </Card>
-                ))}
 
-                {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
-                  <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
-                    No baraat added. Click "Add Baraat" to add baraat details.
+                      <div className="flex items-end">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="sm"
+                          onClick={() => {
+                            const currentBaraat = form.getValues("baraat") || [];
+                            form.setValue(
+                              "baraat",
+                              currentBaraat.filter((_, i) => i !== index)
+                            );
+                          }}
+                          disabled={isSubmitting || loading}
+                          className="h-9 w-9 p-0 text-destructive hover:text-destructive"
+                        >
+                          <X className="h-4 w-4" />
+                        </Button>
+                      </div>
+                    </div>
+                  ))}
+
+                  <div className="pt-0">
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => {
+                        const currentBaraat = form.getValues("baraat") || [];
+                        form.setValue("baraat", [
+                          ...currentBaraat,
+                          {
+                            name: "",
+                            quantity: "",
+                          },
+                        ]);
+                      }}
+                      disabled={isSubmitting || loading || baraatFieldsLoading}
+                    >
+                      <Plus className="h-4 w-4 mr-1" />
+                      Add Baraat
+                    </Button>
                   </div>
-                )}
+
+                  {(!form.watch("baraat") || form.watch("baraat")?.length === 0) && (
+                    <div className="text-sm text-muted-foreground text-center py-4 border border-dashed rounded-lg">
+                      No baraat added. Click "Add Baraat" to add baraat details.
+                    </div>
+                  )}
+                </Card>
               </div>
 
               {/* Status and Assignment Section */}
@@ -905,13 +912,16 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                     <FormItem>
                       <FormLabel>Source</FormLabel>
                       <FormControl>
-                        <Select onValueChange={field.onChange} value={field.value || 'others'}>
+                        <Select onValueChange={field.onChange} value={field.value || ""} disabled={isPending}>
                           <SelectTrigger>
-                            <SelectValue />
+                            <SelectValue placeholder="Select source" />
                           </SelectTrigger>
                           <SelectContent>
-                            <SelectItem value="others">Others</SelectItem>
-                            <SelectItem value="reference">Reference</SelectItem>
+                            {sources.map((source) => (
+                              <SelectItem key={source._id} value={source.name}>
+                                {source.name}
+                              </SelectItem>
+                            ))}
                           </SelectContent>
                         </Select>
                       </FormControl>
@@ -950,6 +960,47 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                     )}
                   />
                 )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <FormField
+                  control={form.control}
+                  name="referenceDetails"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Reference Details</FormLabel>
+                      <FormControl>
+                        <Input
+                          placeholder="Enter reference details"
+                          {...field}
+                          value={field.value || ""}
+                          disabled={isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
+
+                <FormField
+                  control={form.control}
+                  name="remark"
+                  render={({ field }) => (
+                    <FormItem>
+                      <FormLabel>Remark</FormLabel>
+                      <FormControl>
+                        <Textarea
+                          placeholder="Add remarks"
+                          rows={2}
+                          {...field}
+                          value={field.value || ""}
+                          disabled={isPending}
+                        />
+                      </FormControl>
+                      <FormMessage />
+                    </FormItem>
+                  )}
+                />
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">

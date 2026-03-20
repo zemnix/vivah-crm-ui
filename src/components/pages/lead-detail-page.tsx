@@ -569,6 +569,25 @@ export default function LeadDetailPage({
                 )}
 
                 <div className="space-y-2">
+                  <p className="text-sm font-medium text-foreground">Source</p>
+                  <p className="text-sm text-muted-foreground">{lead.source || 'Not provided'}</p>
+                </div>
+
+                {lead.referenceDetails && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Reference Details</p>
+                    <p className="text-sm text-muted-foreground">{lead.referenceDetails}</p>
+                  </div>
+                )}
+
+                {lead.remark && (
+                  <div className="space-y-2">
+                    <p className="text-sm font-medium text-foreground">Remark</p>
+                    <p className="text-sm text-muted-foreground whitespace-pre-wrap">{lead.remark}</p>
+                  </div>
+                )}
+
+                <div className="space-y-2">
                   <p className="text-sm font-medium text-foreground">Status</p>
                   <div className="flex items-center gap-4">
                     <StatusBadge status={lead.status} type="lead" />

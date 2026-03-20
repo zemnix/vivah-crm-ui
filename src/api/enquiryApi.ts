@@ -49,7 +49,7 @@ export interface ConvertEnquiryToLeadData {
   assignedTo?: string;
   typesOfEvent?: Array<{
     name: string;
-    date: string; // ISO date string
+    date?: string; // ISO date string
     dayNight: 'day' | 'night' | 'both';
     numberOfGuests: number;
   }>;
@@ -86,4 +86,3 @@ export const convertEnquiryToLeadApi = async (enquiryId: string, convertData: Co
   const response = await apiClient.post(`/enquiries/${enquiryId}/convert`, convertData);
   return response.data.data;
 };
-

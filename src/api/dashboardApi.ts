@@ -53,14 +53,12 @@ export interface DashboardFilters {
   startDate?: string; // Format: "2024-01-01"
   endDate?: string; // Format: "2024-01-31"
   staffId?: string; // Staff ID for filtering
-  branch?: string; // Branch filter
 }
 
 export interface Staff {
   id: string;
   name: string;
   email: string;
-  branch?: string;
   role?: 'staff' | 'admin';
 }
 

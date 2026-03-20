@@ -52,22 +52,29 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
 
       setLoading(true);
       try {
-        // First, try to initialize progression records from events
+        // Try initialization, but don't block showing data if initialization
+        // returns "already exists" or any non-critical error.
         if (lead.typesOfEvent && lead.typesOfEvent.length > 0) {
-          await initializeProgressionApi(lead._id);
+          try {
+            await initializeProgressionApi(lead._id);
+          } catch (initError) {
+            console.warn('Progression initialization skipped:', initError);
+          }
         }
-        
-        // Then fetch all progression records
-        const data = await getProgressionByLeadIdApi(lead._id);
-        setProgressions(data);
-        setInitialized(true);
-      } catch (error) {
-        console.error('Failed to fetch progression:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to load client progression data',
-          variant: 'destructive',
-        });
+
+        // Always fetch progression records; only show toast if this fails.
+        try {
+          const data = await getProgressionByLeadIdApi(lead._id);
+          setProgressions(data);
+          setInitialized(true);
+        } catch (fetchError) {
+          console.error('Failed to fetch progression:', fetchError);
+          toast({
+            title: 'Error',
+            description: 'Failed to load client progression data',
+            variant: 'destructive',
+          });
+        }
       } finally {
         setLoading(false);
       }

@@ -43,7 +43,6 @@ export default function AdminDashboard() {
   const [selectedMonth, setSelectedMonth] = useState<string>('');
   const [filterType, setFilterType] = useState<'all' | 'month' | 'range'>('all');
   const [selectedStaffId, setSelectedStaffId] = useState<string>('');
-  const [selectedBranch, setSelectedBranch] = useState<string>('All Branches');
   const [staffList, setStaffList] = useState<Staff[]>([]);
   const [isLoadingStaff, setIsLoadingStaff] = useState(false);
 
@@ -86,11 +85,6 @@ export default function AdminDashboard() {
       newFilters.staffId = selectedStaffId;
     }
     
-    // Preserve branch filter
-    if (selectedBranch && selectedBranch !== 'All Branches') {
-      newFilters.branch = selectedBranch;
-    }
-    
     setFilters(newFilters);
   };
 
@@ -109,22 +103,6 @@ export default function AdminDashboard() {
     console.log('Staff filter changed:', { staffId, actualStaffId, newFilters });
     setFilters(newFilters);
   };
-
-  const handleBranchChange = (branch: string) => {
-    setSelectedBranch(branch);
-    
-    const newFilters = { ...filters };
-    
-    if (branch && branch !== 'All Branches') {
-      newFilters.branch = branch;
-    } else {
-      delete newFilters.branch;
-    }
-    
-    console.log('Branch filter changed:', { branch, newFilters });
-    setFilters(newFilters);
-  };
-
 
   const handleRefresh = () => {
     fetchData(filters);
@@ -371,7 +349,7 @@ export default function AdminDashboard() {
                       <SelectItem value="all">All Staff</SelectItem>
                       {staffList.map((staff) => (
                         <SelectItem key={staff.id} value={staff.id}>
-                          {`${staff.name} (staff${staff.branch ? `, ${staff.branch}` : ''})`}
+                          {`${staff.name} (staff)`}
                         </SelectItem>
                       ))}
                     </SelectContent>
@@ -473,22 +451,6 @@ export default function AdminDashboard() {
                 </div>
               )}
 
-
-              {/* Branch Filter */}
-              <div className="flex items-center space-x-2">
-                <label htmlFor="branch-filter" className="text-sm font-medium whitespace-nowrap">Branch Filter:</label>
-                <Select value={selectedBranch} onValueChange={handleBranchChange}>
-                  <SelectTrigger id="branch-filter" className="w-48">
-                    <SelectValue placeholder="Select branch" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="All Branches">All Branches</SelectItem>
-                    <SelectItem value="Bhubaneswar">Bhubaneswar</SelectItem>
-                    <SelectItem value="Balasore">Balasore</SelectItem>
-                  </SelectContent>
-                </Select>
-              </div>
-
               {/* Apply/Clear Filters */}
               <div className="flex justify-end gap-2 pt-4 border-t">
                 <Button
@@ -496,7 +458,6 @@ export default function AdminDashboard() {
                   size="sm"
                   onClick={() => {
                     setSelectedStaffId('');
-                    setSelectedBranch('All Branches');
                     setSelectedMonth('');
                     setDateRange({ from: undefined, to: undefined });
                     setFilterType('all');
@@ -513,11 +474,7 @@ export default function AdminDashboard() {
                     if (selectedStaffId) {
                       newFilters.staffId = selectedStaffId;
                     }
-                    
-                    if (selectedBranch && selectedBranch !== 'All Branches') {
-                      newFilters.branch = selectedBranch;
-                    }
-                    
+
                     if (filterType === 'month' && selectedMonth) {
                       newFilters.month = selectedMonth;
                     } else if (filterType === 'range' && dateRange.from && dateRange.to) {

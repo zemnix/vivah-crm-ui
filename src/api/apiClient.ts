@@ -12,10 +12,7 @@ const useRemoteInDev = String(import.meta.env.VITE_USE_REMOTE_API || '').toLower
 
 const DEFAULT_API_BASE_URL = import.meta.env.DEV ? DEV_DEFAULT_API_BASE_URL : PROD_DEFAULT_API_BASE_URL;
 
-const API_BASE_URL =
-  import.meta.env.DEV && !useRemoteInDev
-    ? DEV_DEFAULT_API_BASE_URL
-    : (envBaseUrl || DEFAULT_API_BASE_URL);
+const API_BASE_URL = "https://vivah-backend-901773979793.asia-south1.run.app/api/v1";
 
 // Create axios instance with interceptor for auth
 const apiClient = axios.create({

@@ -57,7 +57,7 @@ const formatDateToLocal = (date: Date): string => {
 };
 
 // Define allowed status transitions
-const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
+const STAFF_ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   'new': ['follow_up', 'not_interested'],
   'follow_up': ['not_interested', 'quotation_sent', 'converted', 'lost'],
   'not_interested': [], // Terminal status
@@ -65,6 +65,8 @@ const ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
   'converted': [], // Terminal status
   'lost': [], // Terminal status
 };
+
+const DEFAULT_STATUSES: LeadStatus[] = ['new'];
 
 interface LeadsPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -375,7 +377,7 @@ export default function LeadsPage({
   const [selectedStatuses, setSelectedStatuses] = useState<LeadStatus[]>(
     initialStatus 
       ? (Array.isArray(initialStatus) ? initialStatus : [initialStatus])
-      : ['new']
+      : DEFAULT_STATUSES
   );
   const [showFilters, setShowFilters] = useState(true);
   const [dateFrom, setDateFrom] = useState<string>('');
@@ -557,7 +559,10 @@ export default function LeadsPage({
   };
 
   const isTransitionAllowed = (fromStatus: LeadStatus, toStatus: LeadStatus): boolean => {
-    return ALLOWED_TRANSITIONS[fromStatus]?.includes(toStatus) || false;
+    if (userRole === 'admin') {
+      return true;
+    }
+    return STAFF_ALLOWED_TRANSITIONS[fromStatus]?.includes(toStatus) || false;
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -924,7 +929,19 @@ export default function LeadsPage({
     { value: 'lost', label: 'Lost' },
   ];
 
-  const handleStatusToggle = (status: LeadStatus) => {
+  const isAllStatusesSelected = allStatuses.every((status) => selectedStatuses.includes(status.value));
+
+  const handleStatusToggle = (status: LeadStatus | 'all') => {
+    if (status === 'all') {
+      const nextStatuses = isAllStatusesSelected
+        ? DEFAULT_STATUSES
+        : allStatuses.map((item) => item.value);
+
+      setSelectedStatuses(nextStatuses);
+      setCurrentPage(1);
+      return;
+    }
+
     if (selectedStatuses.length === 1 && selectedStatuses[0] === status) {
       toast({
         title: "At least one status must be selected",
@@ -960,7 +977,7 @@ export default function LeadsPage({
   };
 
   const clearAllFilters = () => {
-    const defaultStatuses: LeadStatus[] = ['new'];
+      const defaultStatuses: LeadStatus[] = DEFAULT_STATUSES;
     setSelectedStatuses(defaultStatuses);
     setSearchTerm("");
     setDebouncedSearchTerm("");
@@ -1047,7 +1064,7 @@ export default function LeadsPage({
     dateTo: string;
     showFilters: boolean;
     setShowFilters: (show: boolean) => void;
-    handleStatusToggle: (status: LeadStatus) => void;
+    handleStatusToggle: (status: LeadStatus | 'all') => void;
     clearAllFilters: () => void;
     clearDateFilter: () => void;
     handleDateRangeChange: (from: string, to: string) => void;
@@ -1106,6 +1123,20 @@ export default function LeadsPage({
               Lead Status
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 xl:flex xl:flex-wrap gap-2 lg:gap-3">
+              <div className="flex items-center space-x-1.5">
+                <Checkbox
+                  id="status-all"
+                  checked={isAllStatusesSelected}
+                  onCheckedChange={() => handleStatusToggle('all')}
+                  className="h-3.5 w-3.5 cursor-pointer"
+                />
+                <label
+                  htmlFor="status-all"
+                  className={`text-xs cursor-pointer select-none whitespace-nowrap ${isAllStatusesSelected ? 'text-red-600 font-medium' : 'text-muted-foreground'}`}
+                >
+                  All
+                </label>
+              </div>
               {allStatuses.map((status) => (
                 <div key={status.value} className="flex items-center space-x-1.5">
                   <Checkbox
