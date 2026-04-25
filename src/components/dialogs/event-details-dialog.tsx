@@ -6,13 +6,14 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { CalendarIcon, Clock, User } from 'lucide-react';
+import { Building2, CalendarIcon, Clock, User } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 
 interface EventDetail {
   eventName: string;
   clientName: string;
+  venueName?: string;
   dayNight: 'day' | 'night' | 'both';
   leadId: string;
 }
@@ -80,6 +81,12 @@ export function EventDetailsDialog({
                       <User className="h-4 w-4" />
                       <span className="font-medium">{event.clientName}</span>
                     </div>
+                    {event.venueName && (
+                      <div className="mt-2 flex items-center gap-2 text-sm text-muted-foreground">
+                        <Building2 className="h-4 w-4" />
+                        <span>{event.venueName}</span>
+                      </div>
+                    )}
                   </div>
                   <Badge
                     variant="outline"
@@ -100,4 +107,3 @@ export function EventDetailsDialog({
     </Dialog>
   );
 }
-

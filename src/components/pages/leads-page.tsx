@@ -7,6 +7,7 @@ import { DataTable } from "@/components/ui/data-table";
 import { StatusBadge } from "@/components/ui/status-badge";
 import { InteractionDialog } from "@/components/dialogs/interaction-dialog";
 import { useLeadStore } from "@/store/leadStore";
+import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import type { User } from "@/api/userApi";
 import type { Lead, LeadStatus, LeadQueryParams } from "@/api/leadApi";
@@ -54,6 +55,27 @@ const formatDateToLocal = (date: Date): string => {
   const month = String(date.getMonth() + 1).padStart(2, '0');
   const day = String(date.getDate()).padStart(2, '0');
   return `${year}-${month}-${day}`;
+};
+
+const getSharedAssigneeNames = (lead: Lead): string[] =>
+  (lead.additionalAssignees || []).map((staff) => staff.name);
+
+const getLeadAssignmentSummary = (lead: Lead): string => {
+  const sharedNames = getSharedAssigneeNames(lead);
+
+  if (!lead.assignedTo && sharedNames.length === 0) {
+    return 'Unassigned';
+  }
+
+  if (lead.assignedTo && sharedNames.length === 0) {
+    return lead.assignedTo.name;
+  }
+
+  if (!lead.assignedTo && sharedNames.length > 0) {
+    return `Shared with ${sharedNames.join(', ')}`;
+  }
+
+  return `${lead.assignedTo?.name} + ${sharedNames.length} shared`;
 };
 
 // Define allowed status transitions
@@ -147,7 +169,7 @@ const DraggableLeadCard = ({
             </p>
             {userRole === 'admin' && (
               <p className="text-xs text-muted-foreground truncate">
-                Assigned to: {lead.assignedTo ? lead.assignedTo.name : 'Unassigned'}
+                {getLeadAssignmentSummary(lead)}
               </p>
             )}
           </div>
@@ -366,12 +388,13 @@ export default function LeadsPage({
   const [isDeleting, setIsDeleting] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
   const [assignDialogOpen, setAssignDialogOpen] = useState(false);
-  const [leadToAssign, setLeadToAssign] = useState<Lead | null>(null);
+  const [leadsToAssign, setLeadsToAssign] = useState<Lead[]>([]);
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadEditDialogOpen, setLeadEditDialogOpen] = useState(false);
   const [leadToEdit, setLeadToEdit] = useState<Lead | null>(null);
   const [selectedAssignedTo, setSelectedAssignedTo] = useState<string>("All Staff");
   const selectedAssignedToRef = useRef<string>("All Staff");
+  const [selectedLeadIds, setSelectedLeadIds] = useState<Set<string>>(new Set());
 
   // Filter states - use initialStatus if provided, otherwise default to 'new'
   const [selectedStatuses, setSelectedStatuses] = useState<LeadStatus[]>(
@@ -392,6 +415,7 @@ export default function LeadsPage({
     updateLeadStatusOptimistic,
     deleteLead,
   } = useLeadStore();
+  const { user } = useAuthStore();
 
   const { users: staffMembers, getAllStaff } = useUserStore();
   const navigate = useNavigate();
@@ -441,6 +465,10 @@ export default function LeadsPage({
       getAllStaff();
     }
   }, [userRole, getAllStaff]);
+
+  useEffect(() => {
+    setSelectedLeadIds(new Set());
+  }, [leads]);
 
   // Debounced search with minimum 3 characters
   useEffect(() => {
@@ -534,8 +562,48 @@ export default function LeadsPage({
   };
 
   const handleAssign = (lead: Lead) => {
-    setLeadToAssign(lead);
+    setLeadsToAssign([lead]);
     setAssignDialogOpen(true);
+  };
+
+  const handleBulkAssign = () => {
+    const selectedLeads = leads.filter((lead) => selectedLeadIds.has(lead._id));
+    if (selectedLeads.length === 0) {
+      return;
+    }
+
+    setLeadsToAssign(selectedLeads);
+    setAssignDialogOpen(true);
+  };
+
+  const handleToggleLeadSelection = (lead: Lead, checked: boolean) => {
+    setSelectedLeadIds((current) => {
+      const nextSelection = new Set(current);
+
+      if (checked) {
+        nextSelection.add(lead._id);
+      } else {
+        nextSelection.delete(lead._id);
+      }
+
+      return nextSelection;
+    });
+  };
+
+  const handleToggleAllLeadSelections = (checked: boolean, items: Lead[]) => {
+    setSelectedLeadIds((current) => {
+      const nextSelection = new Set(current);
+
+      items.forEach((lead) => {
+        if (checked) {
+          nextSelection.add(lead._id);
+        } else {
+          nextSelection.delete(lead._id);
+        }
+      });
+
+      return nextSelection;
+    });
   };
 
   const handleEdit = (lead: Lead) => {
@@ -668,11 +736,18 @@ export default function LeadsPage({
       key: 'assignedTo',
       header: 'Assigned To',
       render: (_value: string, lead: Lead) => (
-        <div className="flex items-center gap-2">
+        <div className="flex items-start gap-2">
           <UserIcon className="h-4 w-4 text-muted-foreground" />
-          <span className="text-sm text-foreground">
-            {lead.assignedTo?.name || 'Unassigned'}
-          </span>
+          <div className="min-w-0">
+            <div className="text-sm text-foreground">
+              {lead.assignedTo?.name || 'Unassigned'}
+            </div>
+            {getSharedAssigneeNames(lead).length > 0 && (
+              <div className="truncate text-xs text-muted-foreground">
+                Shared: {getSharedAssigneeNames(lead).join(', ')}
+              </div>
+            )}
+          </div>
         </div>
       ),
     }] : []),
@@ -793,19 +868,16 @@ export default function LeadsPage({
           <DropdownMenuItem onClick={() => handleView(lead)}>
             View Details
           </DropdownMenuItem>
-          {(userRole === 'admin' || userRole === 'staff') && (
+          {(userRole === 'admin' || (userRole === 'staff' && lead.assignedTo?._id === user?.id)) && (
             <DropdownMenuItem onClick={() => handleEdit(lead)}>
               Edit Lead
             </DropdownMenuItem>
           )}
           {userRole === 'admin' && (
             <>
-              {/* if lead is not assigned to any staff, then show the assign to staff option */}
-              {lead?.assignedTo == undefined && (
-                <DropdownMenuItem onClick={() => handleAssign(lead)}>
-                  Assign to Staff
-                </DropdownMenuItem>
-              )}
+              <DropdownMenuItem onClick={() => handleAssign(lead)}>
+                Manage Assignment
+              </DropdownMenuItem>
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onClick={() => handleDelete(lead)}
@@ -1333,6 +1405,29 @@ export default function LeadsPage({
           handleAssignedToChange={handleAssignedToChange}
         />
 
+        {userRole === 'admin' && selectedLeadIds.size > 0 && (
+          <Card className="mb-4 border-dashed">
+            <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <div className="text-sm font-semibold text-foreground">
+                  {selectedLeadIds.size} lead{selectedLeadIds.size === 1 ? '' : 's'} selected
+                </div>
+                <div className="text-sm text-muted-foreground">
+                  Apply the same primary owner and/or shared staff access to the selected leads.
+                </div>
+              </div>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <Button variant="outline" onClick={() => setSelectedLeadIds(new Set())}>
+                  Clear Selection
+                </Button>
+                <Button onClick={handleBulkAssign}>
+                  Assign Selected Leads
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        )}
+
         <Card>
           <CardContent className="p-1 sm:p-2 lg:p-3">
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
@@ -1376,6 +1471,11 @@ export default function LeadsPage({
                   onPageChange={handlePageChange}
                   onPageSizeChange={handlePageSizeChange}
                   showPageSizeSelector={false}
+                  selectable={userRole === 'admin'}
+                  selectedRowIds={Array.from(selectedLeadIds)}
+                  getRowId={(lead) => lead._id}
+                  onToggleRowSelection={handleToggleLeadSelection}
+                  onToggleAllRows={handleToggleAllLeadSelections}
                 />
               </TabsContent>
 
@@ -1431,7 +1531,7 @@ export default function LeadsPage({
           <AssignLeadDialog
             open={assignDialogOpen}
             onOpenChange={setAssignDialogOpen}
-            lead={leadToAssign}
+            leads={leadsToAssign}
             staffMembers={staffMembers || []}
             onSuccess={() => {
               // Refresh data after successful assignment
@@ -1450,6 +1550,8 @@ export default function LeadsPage({
               }
 
               fetchLeads(queryParams);
+              setSelectedLeadIds(new Set());
+              setLeadsToAssign([]);
             }}
           />
         )}

@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Timeline } from "@/components/ui/timeline";
 import { InteractionDialog } from "@/components/dialogs/interaction-dialog";
 import { useLeadStore } from "@/store/leadStore";
+import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { getLeadActivitiesApi, getActivityTypeLabel } from "@/api/activityApi";
@@ -23,6 +24,7 @@ import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmati
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
 import { ClientProgressionTable } from "@/components/client-progression-table";
+import { ProductionTable } from "@/components/production-table";
 
 interface LeadDetailPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -46,6 +48,7 @@ export default function LeadDetailPage({
   const navigate = useNavigate();
   const { id } = useParams<{ id: string }>();
   const { toast } = useToast();
+  const { user } = useAuthStore();
 
   const {
     selectedLead: lead,
@@ -58,6 +61,7 @@ export default function LeadDetailPage({
 
   const { users, fetchAllUsers } = useUserStore();
   const { activeFields, fetchActiveFields } = useBaraatConfigStore();
+  const canEditLead = userRole === 'admin' || (userRole === 'staff' && lead?.assignedTo?._id === user?.id);
 
   useEffect(() => {
     const loadLead = async () => {
@@ -261,7 +265,7 @@ export default function LeadDetailPage({
       if (quantity === null || quantity === undefined) {
         return '';
       }
-      
+
       // If it's already a string or number, convert directly
       if (typeof quantity === 'string') {
         return quantity.trim();
@@ -269,7 +273,7 @@ export default function LeadDetailPage({
       if (typeof quantity === 'number') {
         return String(quantity);
       }
-      
+
       // If it's an object, try to extract meaningful value
       if (typeof quantity === 'object') {
         // Check if it has a value property (Mongoose Map might wrap it)
@@ -290,13 +294,13 @@ export default function LeadDetailPage({
         // Last resort: return empty string for complex objects
         return '';
       }
-      
+
       return String(quantity);
     };
 
     // Convert SFX from Map/object to array format
     let sfxEntries: Array<{ name: string; quantity: string }> = [];
-    
+
     if (Array.isArray(lead.sfx)) {
       // If it's already an array (legacy format), use it directly
       sfxEntries = lead.sfx.map(s => ({
@@ -307,7 +311,7 @@ export default function LeadDetailPage({
       // If it's an object/Map, convert it to array
       // Handle both regular objects and Mongoose Map-like structures
       let entries: Array<[string, any]> = [];
-      
+
       // Check if it's a Map instance (in browser environment)
       // Use type assertion since lead.sfx can be array or object at runtime
       const sfxValue = lead.sfx as any;
@@ -317,7 +321,7 @@ export default function LeadDetailPage({
         // It's a plain object
         entries = Object.entries(sfxValue) as Array<[string, any]>;
       }
-      
+
       sfxEntries = entries
         .filter((entry): entry is [string, any] => {
           const [name] = entry;
@@ -340,7 +344,7 @@ export default function LeadDetailPage({
 
     // Create a map of field names to field configs for quick lookup
     const fieldMap = new Map(activeFields.map(field => [field.name, field]));
-    
+
     // Get all keys from baraatDetails and sort by field name
     const detailKeys = Object.keys(lead.baraatDetails);
     const sortedKeys = detailKeys.sort((a, b) => {
@@ -357,8 +361,8 @@ export default function LeadDetailPage({
       const value = lead.baraatDetails?.[key];
       const field = fieldMap.get(key);
       const label = field?.name || key;
-      const displayValue = value !== null && value !== undefined && value !== '' 
-        ? String(value) 
+      const displayValue = value !== null && value !== undefined && value !== ''
+        ? String(value)
         : 'Not provided';
 
       return { key, label, displayValue };
@@ -470,9 +474,11 @@ export default function LeadDetailPage({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end">
-                  <DropdownMenuItem onClick={handleEdit}>
-                    Edit Lead
-                  </DropdownMenuItem>
+                  {canEditLead && (
+                    <DropdownMenuItem onClick={handleEdit}>
+                      Edit Lead
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem onClick={handleAssign}>
                     Assign to Staff
                   </DropdownMenuItem>
@@ -493,7 +499,7 @@ export default function LeadDetailPage({
             )}
 
             {/* Staff Actions - Edit button */}
-            {userRole === 'staff' && (
+            {userRole === 'staff' && canEditLead && (
               <Button
                 variant="outline"
                 onClick={handleEdit}
@@ -558,12 +564,12 @@ export default function LeadDetailPage({
                   </div>
                 )}
 
-                {lead.customer?.venueEmail && (
+                {lead.customer?.venueName && (
                   <div className="flex items-center gap-3">
-                    <Mail className="h-5 w-5 text-muted-foreground" />
+                    <Building2 className="h-5 w-5 text-muted-foreground" />
                     <div>
-                      <p className="text-sm font-medium text-foreground">Venue Email</p>
-                      <p className="text-sm text-muted-foreground">{lead.customer.venueEmail}</p>
+                      <p className="text-sm font-medium text-foreground">Venue Name</p>
+                      <p className="text-sm text-muted-foreground">{lead.customer.venueName}</p>
                     </div>
                   </div>
                 )}
@@ -616,12 +622,22 @@ export default function LeadDetailPage({
 
                 {/* Assigned To - Only for admin */}
                 {userRole === 'admin' && (
-                  <div className="space-y-2">
-                    <p className="text-sm font-medium text-foreground">Assigned To</p>
-                    <p className="text-sm text-muted-foreground">
-                      {lead.assignedTo ? `${lead.assignedTo.name} (${lead.assignedTo.role})` : 'Unassigned'}
-                    </p>
-                  </div>
+                  <>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">Primary Owner</p>
+                      <p className="text-sm text-muted-foreground">
+                        {lead.assignedTo ? `${lead.assignedTo.name} (${lead.assignedTo.role})` : 'Unassigned'}
+                      </p>
+                    </div>
+                    <div className="space-y-2">
+                      <p className="text-sm font-medium text-foreground">Shared With</p>
+                      <p className="text-sm text-muted-foreground">
+                        {lead.additionalAssignees && lead.additionalAssignees.length > 0
+                          ? lead.additionalAssignees.map((staff) => `${staff.name} (${staff.role})`).join(', ')
+                          : 'No shared staff'}
+                      </p>
+                    </div>
+                  </>
                 )}
               </CardContent>
             </Card>
@@ -653,10 +669,10 @@ export default function LeadDetailPage({
                               <p className="text-foreground font-medium">
                                 {event.date
                                   ? new Date(event.date).toLocaleDateString('en-US', {
-                                      year: 'numeric',
-                                      month: 'long',
-                                      day: 'numeric',
-                                    })
+                                    year: 'numeric',
+                                    month: 'long',
+                                    day: 'numeric',
+                                  })
                                   : 'Not set'}
                               </p>
                             </div>
@@ -729,6 +745,10 @@ export default function LeadDetailPage({
             {lead?.status === 'converted' && (
               <ClientProgressionTable lead={lead} />
             )}
+            {lead?.status === 'converted' && (
+              <ProductionTable lead={lead} />
+            )}
+
           </div>
 
           {/* Activity Timeline */}
@@ -789,7 +809,7 @@ export default function LeadDetailPage({
           <AssignLeadDialog
             open={assignDialogOpen}
             onOpenChange={setAssignDialogOpen}
-            lead={lead}
+            leads={lead ? [lead] : []}
             staffMembers={users || []}
             onSuccess={() => {
               // Refresh lead data after successful assignment

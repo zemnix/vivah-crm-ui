@@ -23,6 +23,7 @@ import { Button } from '@/components/ui/button';
 interface EventDetail {
   eventName: string;
   clientName: string;
+  venueName?: string;
   dayNight: 'day' | 'night' | 'both';
   leadId: string;
 }
@@ -115,10 +116,13 @@ function CalendarGrid({
                       <div
                         key={idx}
                         className="w-full truncate text-[9px] px-1 py-0.5 rounded font-medium bg-primary/20 text-primary"
-                        title={`${event.eventName} - ${event.clientName}`}
+                        title={`${event.eventName} - ${event.clientName}${event.venueName ? ` - ${event.venueName}` : ''}`}
                       >
                         <span className="truncate block font-semibold">{event.eventName}</span>
                         <span className="truncate block text-[8px] opacity-75">{event.clientName}</span>
+                        {event.venueName && (
+                          <span className="truncate block text-[8px] opacity-75">{event.venueName}</span>
+                        )}
                       </div>
                     ))}
                     {events.length > 2 && (
@@ -175,6 +179,7 @@ export function EventsCalendar() {
               eventsMap.get(dateKey)!.push({
                 eventName: event.name,
                 clientName: lead.customer.name,
+                venueName: lead.customer.venueName,
                 dayNight: event.dayNight,
                 leadId: lead._id,
               });

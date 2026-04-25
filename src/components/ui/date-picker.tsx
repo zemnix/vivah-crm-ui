@@ -1,9 +1,11 @@
-import { format } from "date-fns"
+import { format, isValid, parse } from "date-fns"
 import { Calendar as CalendarIcon } from "lucide-react"
+import * as React from "react"
 
 import { cn } from "@/lib/utils"
 import { Button } from "@/components/ui/button"
 import { Calendar } from "@/components/ui/calendar"
+import { Input } from "@/components/ui/input"
 import {
   Popover,
   PopoverContent,
@@ -29,8 +31,46 @@ export function DatePicker({
   placeholder = "Pick a date",
   disabled = false,
 }: DatePickerProps) {
+  const [open, setOpen] = React.useState(false)
+  const [inputValue, setInputValue] = React.useState(date ? format(date, "dd/MM/yyyy") : "")
+
+  React.useEffect(() => {
+    setInputValue(date ? format(date, "dd/MM/yyyy") : "")
+  }, [date])
+
+  const parseInputValue = (value: string) => {
+    const trimmedValue = value.trim()
+
+    if (!trimmedValue) {
+      return undefined
+    }
+
+    const parsedDate = parse(trimmedValue, "dd/MM/yyyy", new Date())
+    return isValid(parsedDate) ? parsedDate : null
+  }
+
+  const handleInputBlur = () => {
+    const parsedDate = parseInputValue(inputValue)
+
+    if (parsedDate === undefined) {
+      onDateChange?.(undefined)
+      setInputValue("")
+      return
+    }
+
+    if (parsedDate) {
+      onDateChange?.(parsedDate)
+      setInputValue(format(parsedDate, "dd/MM/yyyy"))
+      return
+    }
+
+    setInputValue(date ? format(date, "dd/MM/yyyy") : "")
+  }
+
+  const currentYear = new Date().getFullYear()
+
   return (
-    <Popover>
+    <Popover open={open} onOpenChange={setOpen}>
       <PopoverTrigger asChild>
         <Button
           variant={"outline"}
@@ -44,11 +84,29 @@ export function DatePicker({
           {date ? format(date, "PPP") : <span>{placeholder}</span>}
         </Button>
       </PopoverTrigger>
-      <PopoverContent className="w-auto p-0">
+      <PopoverContent className="w-auto p-0" align="start">
+        <div className="border-b p-3">
+          <Input
+            value={inputValue}
+            onChange={(e) => setInputValue(e.target.value)}
+            onBlur={handleInputBlur}
+            placeholder="DD/MM/YYYY"
+            disabled={disabled}
+          />
+        </div>
         <Calendar
           mode="single"
           selected={date}
-          onSelect={onDateChange}
+          onSelect={(selectedDate) => {
+            onDateChange?.(selectedDate)
+            setInputValue(selectedDate ? format(selectedDate, "dd/MM/yyyy") : "")
+            if (selectedDate) {
+              setOpen(false)
+            }
+          }}
+          captionLayout="dropdown"
+          fromYear={1900}
+          toYear={currentYear + 50}
           initialFocus
         />
       </PopoverContent>

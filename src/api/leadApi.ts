@@ -8,7 +8,7 @@ export interface Customer {
   dateOfBirth?: string; // ISO date string
   whatsappNumber: string;
   address: string;
-  venueEmail?: string;
+  venueName?: string;
 }
 
 // Types of Event based on backend model
@@ -27,6 +27,13 @@ export interface Sfx {
 
 export type LeadSource = string;
 
+export interface LeadAssignee {
+  _id: string;
+  name: string;
+  email: string;
+  role: string;
+}
+
 // Lead types based on backend model
 export interface Lead {
   _id: string;
@@ -38,18 +45,9 @@ export interface Lead {
   source?: LeadSource;
   referenceDetails?: string;
   remark?: string;
-  createdBy: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
-  assignedTo?: {
-    _id: string;
-    name: string;
-    email: string;
-    role: string;
-  };
+  createdBy: LeadAssignee;
+  assignedTo?: LeadAssignee;
+  additionalAssignees?: LeadAssignee[];
   createdAt: string;
   updatedAt: string;
 }
@@ -72,6 +70,7 @@ export interface LeadCreateData {
   referenceDetails?: string;
   remark?: string;
   assignedTo?: string;
+  additionalAssignees?: string[];
 }
 
 export interface LeadUpdateData {
@@ -84,6 +83,22 @@ export interface LeadUpdateData {
   referenceDetails?: string;
   remark?: string;
   assignedTo?: string;
+  additionalAssignees?: string[];
+}
+
+export interface LeadAssignmentPayload {
+  assignedTo?: string | null;
+  additionalAssignees?: string[];
+}
+
+export interface BulkLeadAssignmentPayload extends LeadAssignmentPayload {
+  leadIds: string[];
+  sharedAssignmentAction?: 'add' | 'replace';
+}
+
+export interface BulkLeadAssignmentResponse {
+  updatedCount: number;
+  leadIds: string[];
 }
 
 export interface LeadQueryParams {
@@ -158,8 +173,18 @@ export const deleteLeadApi = async (leadId: string): Promise<void> => {
   await apiClient.delete(`/leads/${leadId}`);
 };
 
-export const assignLeadApi = async (leadId: string, staffId: string | null): Promise<Lead> => {
-  const response = await apiClient.put(`/leads/assign/${leadId}`, { assignedTo: staffId });
+export const assignLeadApi = async (
+  leadId: string,
+  assignmentData: LeadAssignmentPayload
+): Promise<Lead> => {
+  const response = await apiClient.put(`/leads/assign/${leadId}`, assignmentData);
+  return response.data.data;
+};
+
+export const bulkAssignLeadsApi = async (
+  payload: BulkLeadAssignmentPayload
+): Promise<BulkLeadAssignmentResponse> => {
+  const response = await apiClient.put('/leads/bulk-assign', payload);
   return response.data.data;
 };
 

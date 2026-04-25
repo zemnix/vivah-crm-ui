@@ -23,7 +23,7 @@ const customerSchema = z.object({
   dateOfBirth: z.string().min(1, "Date of birth is required"),
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
-  venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
+  venueName: z.string().max(200, "Venue name must be less than 200 characters").optional().or(z.literal("")).or(z.undefined()),
 });
 
 // Enquiry form schema
@@ -75,7 +75,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
           dateOfBirth: dateOfBirthInput,
           whatsappNumber: enquiry.customer?.whatsappNumber || "",
           address: enquiry.customer?.address || "",
-          venueEmail: enquiry.customer?.venueEmail || "",
+          venueName: enquiry.customer?.venueName || "",
         },
         typesOfEvent: enquiry.typesOfEvent?.length > 0 
           ? enquiry.typesOfEvent.map(event => ({
@@ -93,7 +93,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
         dateOfBirth: "",
         whatsappNumber: "",
         address: "",
-        venueEmail: "",
+        venueName: "",
       },
       typesOfEvent: [{ name: "", numberOfGuests: 0 }],
     };
@@ -137,7 +137,7 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
           ...data.customer,
           dateOfBirth: dateOfBirthISO,
           email: data.customer.email || undefined,
-          venueEmail: data.customer.venueEmail || undefined,
+          venueName: data.customer.venueName?.trim() || undefined,
         },
         typesOfEvent: data.typesOfEvent.filter(event => event.name.trim() !== ""),
       };
@@ -270,12 +270,12 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
 
                 <FormField
                   control={form.control}
-                  name="customer.venueEmail"
+                  name="customer.venueName"
                   render={({ field }) => (
                     <FormItem>
-                      <FormLabel>Venue Email</FormLabel>
+                      <FormLabel>Venue Name</FormLabel>
                       <FormControl>
-                        <Input type="email" placeholder="Enter venue email" {...field} />
+                        <Input placeholder="Enter venue name" {...field} />
                       </FormControl>
                       <FormMessage />
                     </FormItem>
@@ -413,4 +413,3 @@ export function EnquiryDialog({ open, onOpenChange, enquiry, mode }: EnquiryDial
     </Dialog>
   );
 }
-

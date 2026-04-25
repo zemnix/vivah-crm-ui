@@ -28,7 +28,7 @@ const customerSchema = z.object({
   dateOfBirth: z.string().optional().or(z.literal("")).or(z.undefined()),
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
-  venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
+  venueName: z.string().max(200, "Venue name must be less than 200 characters").optional().or(z.literal("")).or(z.undefined()),
 });
 
 // Lead form schema for editing
@@ -75,11 +75,20 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
   const { updateLead, loading } = useLeadStore();
   const { user } = useAuthStore();
   const { users, fetchAllUsers, loading: usersLoading } = useUserStore();
-  const { fields: allFields, fetchAllFields, loading: baraatFieldsLoading } = useBaraatConfigStore();
+  const {
+    fields,
+    activeFields,
+    fetchAllFields,
+    fetchActiveFields,
+    loading: baraatFieldsLoading
+  } = useBaraatConfigStore();
   const { events, fetchAllEvents, loading: eventsLoading } = useEventConfigStore();
   const { sfxConfigs, fetchAllSfxConfigs, loading: sfxLoading } = useSfxConfigStore();
   const { sources, fetchSources, loading: sourcesLoading } = useSourceStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const isAdmin = user?.role === 'admin';
+  const isPrimaryAssignee = Boolean(user?.role === 'staff' && lead?.assignedTo?._id === user.id);
+  const availableBaraatFields = isAdmin ? fields : activeFields;
 
 
   // Combine events from config with event names from lead that aren't in config
@@ -205,7 +214,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
           dateOfBirth: dateOfBirthInput,
           whatsappNumber: lead.customer?.whatsappNumber || "",
           address: lead.customer?.address || "",
-          venueEmail: lead.customer?.venueEmail || "",
+          venueName: lead.customer?.venueName || "",
         },
         status: lead.status || 'new',
         source: lead.source || undefined,
@@ -231,7 +240,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         dateOfBirth: "",
         whatsappNumber: "",
         address: "",
-        venueEmail: "",
+        venueName: "",
       },
       status: 'new',
       source: undefined,
@@ -250,25 +259,29 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
 
   // Reset form when lead changes or when fields are loaded
   useEffect(() => {
-    if (open && allFields.length >= 0) {
-      const shouldReset = lead || allFields.length > 0;
+    if (open && availableBaraatFields.length >= 0) {
+      const shouldReset = lead || availableBaraatFields.length > 0;
       if (shouldReset) {
         form.reset(getDefaultValues());
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lead?._id, allFields.length, open]);
+  }, [lead?._id, availableBaraatFields.length, open]);
 
   // Fetch data when dialog opens
   useEffect(() => {
     if (open) {
-      fetchAllUsers({ role: undefined, page: 1, limit: 100 });
-      fetchAllFields(); // Fetch all fields (active + inactive) for editing
+      if (isAdmin) {
+        fetchAllUsers({ role: undefined, page: 1, limit: 100 });
+        fetchAllFields();
+      } else {
+        fetchActiveFields();
+      }
       fetchAllEvents(); // Include inactive events so existing leads can display their events
       fetchAllSfxConfigs(); // Include inactive SFX configs so existing leads can display their SFX
       fetchSources();
     }
-  }, [open, fetchAllUsers, fetchAllFields, fetchAllEvents, fetchAllSfxConfigs, fetchSources]);
+  }, [open, isAdmin, fetchAllUsers, fetchAllFields, fetchActiveFields, fetchAllEvents, fetchAllSfxConfigs, fetchSources]);
 
   const onSubmit = async (data: LeadEditForm) => {
     if (!user || !lead) return;
@@ -292,7 +305,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
         address: data.customer.address,
         ...(dateOfBirthISO && dateOfBirthISO.trim() !== '' && { dateOfBirth: dateOfBirthISO }),
         ...(data.customer.email && data.customer.email.trim() !== '' && { email: data.customer.email }),
-        ...(data.customer.venueEmail && data.customer.venueEmail.trim() !== '' && { venueEmail: data.customer.venueEmail }),
+        ...(data.customer.venueName && data.customer.venueName.trim() !== '' && { venueName: data.customer.venueName.trim() }),
       };
 
       // Prepare typesOfEvent - convert dates to ISO strings
@@ -482,17 +495,16 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
 
                   <FormField
                     control={form.control}
-                    name="customer.venueEmail"
+                    name="customer.venueName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Venue Email</FormLabel>
+                        <FormLabel>Venue Name</FormLabel>
                         <FormControl>
                           <Input
-                            type="email"
-                            placeholder="venue@example.com"
+                            placeholder="Enter venue name"
                             {...field}
                             value={field.value || ''}
-                            data-testid="venue-email-input"
+                            data-testid="venue-name-input"
                           />
                         </FormControl>
                         <FormMessage />
@@ -823,7 +835,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                                 </SelectTrigger>
                               </FormControl>
                               <SelectContent>
-                                {allFields.map((baraatConfig) => (
+                                {availableBaraatFields.map((baraatConfig) => (
                                   <SelectItem key={baraatConfig._id} value={baraatConfig.name}>
                                     {baraatConfig.name}
                                   </SelectItem>
@@ -959,7 +971,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                   )}
                 />
 
-                {user?.role === 'admin' && (
+                {isAdmin && (
                   <FormField
                     control={form.control}
                     name="assignedTo"
@@ -1033,6 +1045,11 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
               </div>
 
               <div className="flex justify-end space-x-3 pt-4">
+                {!isAdmin && !isPrimaryAssignee && (
+                  <p className="mr-auto text-sm text-muted-foreground">
+                    Only the primary assignee can edit lead details.
+                  </p>
+                )}
                 <Button
                   type="button"
                   variant="outline"
@@ -1044,7 +1061,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isPending}
+                  disabled={isPending || (!isAdmin && !isPrimaryAssignee)}
                   data-testid="update-lead-button"
                 >
                   {isPending ? (

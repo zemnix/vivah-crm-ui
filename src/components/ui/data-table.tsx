@@ -13,6 +13,7 @@ import { ChevronLeft, ChevronRight, Search } from "lucide-react";
 import { useState } from "react";
 import { Skeleton } from "./skeleton";
 import { cn } from "@/lib/utils";
+import { Checkbox } from "./checkbox";
 
 interface Column<T> {
   key: keyof T | string;
@@ -41,6 +42,11 @@ interface DataTableProps<T> {
   onPageSizeChange?: (pageSize: number) => void;
   showPageSizeSelector?: boolean; // Add this prop
   rowClassName?: (item: T) => string;
+  selectable?: boolean;
+  selectedRowIds?: string[];
+  getRowId?: (item: T, index: number) => string;
+  onToggleRowSelection?: (item: T, checked: boolean) => void;
+  onToggleAllRows?: (checked: boolean, items: T[]) => void;
 }
 
 export function DataTable<T extends Record<string, any>>({
@@ -62,6 +68,11 @@ export function DataTable<T extends Record<string, any>>({
   onPageSizeChange,
   showPageSizeSelector = true, // Default to true for backward compatibility
   rowClassName,
+  selectable = false,
+  selectedRowIds = [],
+  getRowId,
+  onToggleRowSelection,
+  onToggleAllRows,
 }: DataTableProps<T>) {
   const [searchTerm, setSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
@@ -91,6 +102,16 @@ export function DataTable<T extends Record<string, any>>({
   const totalPages = serverSide ? serverTotalPages : Math.ceil(sortedData.length / pageSize);
   const startIndex = (currentPage - 1) * pageSize;
   const paginatedData = serverSide ? data || [] : sortedData.slice(startIndex, startIndex + pageSize);
+  const selectedRowIdSet = new Set(selectedRowIds);
+  const resolveRowId = (item: T, index: number) => getRowId?.(item, index) ?? `${index}`;
+  const areAllRowsSelected =
+    selectable &&
+    paginatedData.length > 0 &&
+    paginatedData.every((item, index) => selectedRowIdSet.has(resolveRowId(item, index)));
+  const areSomeRowsSelected =
+    selectable &&
+    !areAllRowsSelected &&
+    paginatedData.some((item, index) => selectedRowIdSet.has(resolveRowId(item, index)));
 
   const handleSort = (key: string) => {
     if (sortKey === key) {
@@ -128,6 +149,11 @@ export function DataTable<T extends Record<string, any>>({
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && (
+                  <TableHead className="w-12">
+                    <Skeleton className="h-4 w-4" />
+                  </TableHead>
+                )}
                 {columns.map((_column, index) => (
                   <TableHead key={index}>
                     <Skeleton className="h-4 w-24" />
@@ -138,6 +164,11 @@ export function DataTable<T extends Record<string, any>>({
             <TableBody>
               {Array.from({ length: 5 }).map((_, index) => (
                 <TableRow key={index}>
+                  {selectable && (
+                    <TableCell>
+                      <Skeleton className="h-4 w-4" />
+                    </TableCell>
+                  )}
                   {columns.map((_, cellIndex) => (
                     <TableCell key={cellIndex}>
                       <Skeleton className="h-4 w-full" />
@@ -193,6 +224,15 @@ export function DataTable<T extends Record<string, any>>({
           <Table>
             <TableHeader>
               <TableRow>
+                {selectable && (
+                  <TableHead className="w-[52px]">
+                    <Checkbox
+                      checked={areAllRowsSelected ? true : areSomeRowsSelected ? "indeterminate" : false}
+                      onCheckedChange={(checked) => onToggleAllRows?.(Boolean(checked), paginatedData)}
+                      aria-label="Select all rows"
+                    />
+                  </TableHead>
+                )}
                 {columns.map((column, index) => (
                   <TableHead 
                     key={index}
@@ -215,7 +255,7 @@ export function DataTable<T extends Record<string, any>>({
             <TableBody>
               {paginatedData.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="text-center py-8">
+                  <TableCell colSpan={columns.length + (actions ? 1 : 0) + (selectable ? 1 : 0)} className="text-center py-8">
                     <div className="text-muted-foreground">
                       {emptyMessage}
                     </div>
@@ -224,7 +264,7 @@ export function DataTable<T extends Record<string, any>>({
               ) : (
                 paginatedData.map((item, index) => (
                   <TableRow 
-                    key={index}
+                    key={resolveRowId(item, index)}
                     className={cn(
                       onRowClick ? "cursor-pointer hover:bg-muted/50" : "",
                       rowClassName?.(item)
@@ -232,6 +272,15 @@ export function DataTable<T extends Record<string, any>>({
                     onClick={() => onRowClick?.(item)}
                     data-testid={`table-row-${index}`}
                   >
+                    {selectable && (
+                      <TableCell onClick={(e) => e.stopPropagation()} className="w-[52px]">
+                        <Checkbox
+                          checked={selectedRowIdSet.has(resolveRowId(item, index))}
+                          onCheckedChange={(checked) => onToggleRowSelection?.(item, Boolean(checked))}
+                          aria-label={`Select row ${index + 1}`}
+                        />
+                      </TableCell>
+                    )}
                     {columns.map((column, cellIndex) => (
                       <TableCell key={cellIndex} className="max-w-[200px]">
                         <div className="truncate">

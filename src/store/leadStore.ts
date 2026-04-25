@@ -8,6 +8,7 @@ import {
   LeadListResponse,
   LeadStatsResponse,
   LeadStatus,
+  LeadAssignmentPayload,
   createLeadApi,
   getLeadsApi,
   getLeadByIdApi,
@@ -45,7 +46,7 @@ interface LeadStore {
   updateLeadStatus: (leadId: string, status: LeadStatus) => Promise<Lead | null>;
   updateLeadStatusOptimistic: (leadId: string, status: LeadStatus) => Promise<{ success: boolean; error?: string }>;
   deleteLead: (leadId: string) => Promise<boolean>;
-  assignLead: (leadId: string, staffId: string | null) => Promise<Lead | null>;
+  assignLead: (leadId: string, assignmentData: LeadAssignmentPayload) => Promise<Lead | null>;
   fetchStats: () => Promise<void>;
   
   // Pagination Actions
@@ -298,10 +299,10 @@ export const useLeadStore = create<LeadStore>()(
         }
       },
 
-      assignLead: async (leadId, staffId) => {
+      assignLead: async (leadId, assignmentData) => {
         set({ loading: true, error: null });
         try {
-          const updatedLead = await assignLeadApi(leadId, staffId);
+          const updatedLead = await assignLeadApi(leadId, assignmentData);
           
           // Update in leads list
           const currentLeads = get().leads;
@@ -355,7 +356,10 @@ export const useLeadStore = create<LeadStore>()(
       },
 
       getAssignedLeads: (staffId) => {
-        return get().leads.filter((lead) => lead.assignedTo?._id === staffId);
+        return get().leads.filter((lead) =>
+          lead.assignedTo?._id === staffId ||
+          (lead.additionalAssignees || []).some((staff) => staff._id === staffId)
+        );
       },
 
       searchLeads: (query) => {

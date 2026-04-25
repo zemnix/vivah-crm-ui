@@ -28,7 +28,7 @@ const customerSchema = z.object({
   dateOfBirth: z.string().optional().or(z.literal("")).or(z.undefined()), // ISO date string
   whatsappNumber: z.string().regex(/^\d{10}$/, "WhatsApp number must be exactly 10 digits"),
   address: z.string().min(1, "Address is required"),
-  venueEmail: z.string().email("Invalid email").optional().or(z.literal("")).or(z.undefined()),
+  venueName: z.string().max(200, "Venue name must be less than 200 characters").optional().or(z.literal("")).or(z.undefined()),
 });
 
 // Lead form schema
@@ -160,7 +160,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
           dateOfBirth: dateOfBirthDate ? dateOfBirthDate.toISOString().split('T')[0] : "",
           whatsappNumber: lead.customer?.whatsappNumber || "",
           address: lead.customer?.address || "",
-          venueEmail: lead.customer?.venueEmail || "",
+          venueName: lead.customer?.venueName || "",
         },
         status: lead.status || 'new',
         source: lead.source || undefined,
@@ -183,7 +183,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         dateOfBirth: "",
         whatsappNumber: "",
         address: "",
-        venueEmail: "",
+        venueName: "",
       },
       status: 'new',
       source: undefined,
@@ -243,7 +243,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         address: data.customer.address,
         ...(dateOfBirthISO && dateOfBirthISO.trim() !== '' && { dateOfBirth: dateOfBirthISO }),
         ...(data.customer.email && data.customer.email.trim() !== '' && { email: data.customer.email }),
-        ...(data.customer.venueEmail && data.customer.venueEmail.trim() !== '' && { venueEmail: data.customer.venueEmail }),
+        ...(data.customer.venueName && data.customer.venueName.trim() !== '' && { venueName: data.customer.venueName.trim() }),
       };
 
       // Prepare typesOfEvent - convert dates to ISO strings
@@ -453,17 +453,16 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
 
                   <FormField
                     control={form.control}
-                    name="customer.venueEmail"
+                    name="customer.venueName"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Venue Email</FormLabel>
+                        <FormLabel>Venue Name</FormLabel>
                         <FormControl>
                           <Input
-                            type="email"
-                            placeholder="venue@example.com"
+                            placeholder="Enter venue name"
                             {...field}
                             value={field.value || ''}
-                            data-testid="venue-email-input"
+                            data-testid="venue-name-input"
                           />
                         </FormControl>
                         <FormMessage />
