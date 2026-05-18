@@ -11,8 +11,10 @@ import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import { useBaraatConfigStore } from "@/store/baraatConfigStore";
 import { getLeadActivitiesApi, getActivityTypeLabel } from "@/api/activityApi";
+import { getInteractionsApi } from "@/api/interactionApi";
 import { updateLeadApi, getLeadName, getLeadEmail, getLeadMobile, getLeadLocation } from "@/api/leadApi";
 import type { Activity } from "@/api/activityApi";
+import type { Interaction } from "@/lib/schema";
 import { ArrowLeft, Plus, FileText, Mail, Building2, Phone, Trash2, MoreHorizontal, Calendar } from "lucide-react";
 import { useNavigate, useParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -39,6 +41,7 @@ export default function LeadDetailPage({
 }: LeadDetailPageProps) {
   const [interactionDialogOpen, setInteractionDialogOpen] = useState(false);
   const [activities, setActivities] = useState<Activity[]>([]);
+  const [interactionsById, setInteractionsById] = useState<Record<string, Interaction>>({});
   const [activitiesLoading, setActivitiesLoading] = useState(false);
   const [localError, setLocalError] = useState<string | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
@@ -101,9 +104,44 @@ export default function LeadDetailPage({
       try {
         const activityData = await getLeadActivitiesApi(lead._id);
         setActivities(activityData || []);
+
+        const interactionResults = await Promise.allSettled([
+          getInteractionsApi({
+            leadId: lead._id,
+            status: 'scheduled',
+            limit: 200,
+            page: 1
+          }),
+          getInteractionsApi({
+            leadId: lead._id,
+            status: 'completed',
+            limit: 200,
+            page: 1
+          }),
+          getInteractionsApi({
+            leadId: lead._id,
+            status: 'missed',
+            limit: 200,
+            page: 1
+          })
+        ]);
+
+        const allInteractions = interactionResults.reduce<Interaction[]>((acc, result) => {
+          if (result.status === 'fulfilled') {
+            acc.push(...(result.value?.interactions || []));
+          }
+          return acc;
+        }, []);
+
+        const interactionsMap = allInteractions.reduce<Record<string, Interaction>>((acc, interaction) => {
+          acc[interaction._id] = interaction;
+          return acc;
+        }, {});
+        setInteractionsById(interactionsMap);
       } catch (error) {
         console.error('Failed to fetch activities:', error);
         setActivities([]);
+        setInteractionsById({});
       } finally {
         setActivitiesLoading(false);
       }
@@ -221,8 +259,15 @@ export default function LeadDetailPage({
         const interactionStatus = activity.meta.interactionStatus || '';
         const date = activity.meta.date ? new Date(activity.meta.date).toLocaleString() : '';
         description = `${interactionType === 'call' ? 'Call' : 'Meeting'} ${interactionStatus}${date ? ` on ${date}` : ''}`;
-        if (activity.meta.remarks) {
-          description += ` - ${activity.meta.remarks}`;
+        const linkedInteraction = activity.refId ? interactionsById[activity.refId] : undefined;
+        const initialRemarks = linkedInteraction?.initialNotes || activity.meta.initialNotes || activity.meta.initialRemarks || activity.meta.notes;
+        const completionRemarks = linkedInteraction?.remarks || activity.meta.remarks;
+        const isScheduled = interactionStatus === 'scheduled';
+        const isCompleted = interactionStatus === 'completed';
+        const remarksToShow = isScheduled ? initialRemarks : isCompleted ? completionRemarks : completionRemarks || initialRemarks;
+
+        if (remarksToShow) {
+          description += ` - ${remarksToShow}`;
         }
       } else if (activity.type === 'status_change' && activity.meta) {
         const oldStatus = activity.meta.oldStatus;

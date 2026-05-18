@@ -161,6 +161,7 @@ export function EventsCalendar() {
         const response = await getLeadsApi({
           status: 'converted',
           limit: 1000,
+          includeAllEventsForCalendar: true,
         });
 
         // Process events and group by date

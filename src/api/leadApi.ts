@@ -109,6 +109,7 @@ export interface LeadQueryParams {
   search?: string;
   dateFrom?: string; // ISO date string
   dateTo?: string; // ISO date string
+  includeAllEventsForCalendar?: boolean;
 }
 
 // Helper to get customer name from lead (for backward compatibility)
