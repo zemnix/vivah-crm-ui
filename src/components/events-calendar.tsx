@@ -157,9 +157,9 @@ export function EventsCalendar() {
     const fetchEvents = async () => {
       setLoading(true);
       try {
-        // Fetch all converted leads
+        // Fetch all active client/event leads
         const response = await getLeadsApi({
-          status: 'converted',
+          status: ['converted', 'completed'],
           limit: 1000,
           includeAllEventsForCalendar: true,
         });

@@ -82,7 +82,7 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   }, [sheet]);
 
   useEffect(() => {
-    if (lead.status !== 'converted') {
+    if (!['converted', 'completed'].includes(lead.status)) {
       reset();
       return;
     }
@@ -245,7 +245,7 @@ export function ProductionTable({ lead }: ProductionTableProps) {
     }
   };
 
-  if (lead.status !== 'converted') {
+  if (!['converted', 'completed'].includes(lead.status)) {
     return null;
   }
 

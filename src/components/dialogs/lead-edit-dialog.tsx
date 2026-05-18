@@ -35,7 +35,7 @@ const customerSchema = z.object({
 const createLeadEditSchema = () => {
   return z.object({
     customer: customerSchema,
-    status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'lost'] as const),
+    status: z.enum(['new', 'follow_up', 'not_interested', 'quotation_sent', 'converted', 'completed', 'lost'] as const),
     source: z.string().min(1, "Source is required").optional().or(z.literal("")),
     referenceDetails: z.string().max(500, "Reference details must be less than 500 characters").optional().or(z.literal("")),
     remark: z.string().max(2000, "Remark must be less than 2000 characters").optional().or(z.literal("")),
@@ -937,7 +937,8 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                             <SelectItem value="not_interested">Not Interested</SelectItem>
                             <SelectItem value="quotation_sent">Quotation Sent</SelectItem>
                             <SelectItem value="converted">Converted</SelectItem>
-                            <SelectItem value="lost">Lost</SelectItem>
+<SelectItem value="completed">Completed</SelectItem>
+<SelectItem value="lost">Lost</SelectItem>
                           </SelectContent>
                         </Select>
                       </FormControl>

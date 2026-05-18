@@ -652,6 +652,7 @@ export default function LeadDetailPage({
                         <SelectItem value="not_interested">Not Interested</SelectItem>
                         <SelectItem value="quotation_sent">Quotation Sent</SelectItem>
                         <SelectItem value="converted">Converted</SelectItem>
+                        <SelectItem value="completed">Completed</SelectItem>
                         <SelectItem value="lost">Lost</SelectItem>
                       </SelectContent>
                     </Select>
@@ -786,11 +787,11 @@ export default function LeadDetailPage({
               </Card>
             )}
 
-            {/* Client Progression - Only for converted leads */}
-            {lead?.status === 'converted' && (
+            {/* Client Progression - Only for converted/completed leads */}
+            {lead && ['converted', 'completed'].includes(lead.status) && (
               <ClientProgressionTable lead={lead} />
             )}
-            {lead?.status === 'converted' && (
+            {lead && ['converted', 'completed'].includes(lead.status) && (
               <ProductionTable lead={lead} />
             )}
 

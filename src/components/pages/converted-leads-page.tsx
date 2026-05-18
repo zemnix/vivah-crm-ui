@@ -7,7 +7,7 @@ interface ConvertedLeadsPageProps {
   readonly testId: string;
 }
 
-// Wrapper component that forces status filter to 'converted'
+// Wrapper component that forces status filter to converted client/event leads
 export default function ConvertedLeadsPage({
   userRole,
   pageTitle,
@@ -20,8 +20,7 @@ export default function ConvertedLeadsPage({
       pageTitle={pageTitle}
       pageDescription={pageDescription}
       testId={testId}
-      initialStatus="converted"
+      initialStatus={['converted', 'completed']}
     />
   );
 }
-

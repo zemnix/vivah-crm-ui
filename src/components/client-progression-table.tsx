@@ -48,7 +48,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
   // Initialize progression records from lead events if they don't exist
   useEffect(() => {
     const initializeAndFetch = async () => {
-      if (!lead?._id || lead.status !== 'converted' || initialized) return;
+      if (!lead?._id || !['converted', 'completed'].includes(lead.status) || initialized) return;
 
       setLoading(true);
       try {

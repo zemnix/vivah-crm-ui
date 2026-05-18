@@ -1,7 +1,7 @@
 import axios from 'axios';
 
-const API_BASE_URL = "https://vivah-backend-901773979793.asia-south1.run.app/api/v1";
-// const API_BASE_URL = "http://localhost:8000/api/v1"
+// const API_BASE_URL = "https://vivah-backend-901773979793.asia-south1.run.app/api/v1";
+const API_BASE_URL = "http://localhost:8000/api/v1"
 
 // Create axios instance with interceptor for auth
 const apiClient = axios.create({

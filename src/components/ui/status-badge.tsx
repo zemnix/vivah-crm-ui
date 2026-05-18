@@ -23,6 +23,8 @@ export function StatusBadge({ status, type, className }: StatusBadgeProps) {
             return 'bg-indigo-100 text-indigo-800 dark:bg-indigo-900 dark:text-indigo-200 border-indigo-200 dark:border-indigo-700';
           case 'converted': 
             return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200 border-green-200 dark:border-green-700 shadow-sm';
+          case 'completed':
+            return 'bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200 border-emerald-200 dark:border-emerald-700 shadow-sm';
           case 'lost': 
             return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 border-red-200 dark:border-red-700';
           default: 
@@ -86,6 +88,7 @@ export function StatusBadge({ status, type, className }: StatusBadgeProps) {
   const getStatusIcon = () => {
     if (type === 'lead') {
       switch (status as LeadStatus) {
+        case 'completed': return '✅ ';
         case 'converted': return '✅ ';
         case 'lost': return '❌ ';
         case 'follow_up': return '🔄 ';

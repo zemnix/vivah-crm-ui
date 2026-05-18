@@ -11,7 +11,7 @@ import { useAuthStore } from "@/store/authStore";
 import { useUserStore } from "@/store/admin/userStore";
 import type { User } from "@/api/userApi";
 import type { Lead, LeadStatus, LeadQueryParams } from "@/api/leadApi";
-import { updateLeadApi, getLeadName, getLeadMobile, getLeadEmail, getLeadLocation } from "@/api/leadApi";
+import { getLeadName, getLeadMobile, getLeadEmail, getLeadLocation } from "@/api/leadApi";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -20,25 +20,6 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
 import { useNavigate } from "react-router-dom";
 import { FaWhatsapp } from "react-icons/fa";
-import {
-  DndContext,
-  DragEndEvent,
-  DragOverlay,
-  DragStartEvent,
-  PointerSensor,
-  useSensor,
-  useSensors,
-  closestCenter,
-  useDroppable,
-} from '@dnd-kit/core';
-import {
-  SortableContext,
-  verticalListSortingStrategy,
-  useSortable,
-} from '@dnd-kit/sortable';
-import {
-  CSS,
-} from '@dnd-kit/utilities';
 import { useToast } from "@/hooks/use-toast";
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -47,7 +28,6 @@ import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmati
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadDialog } from "@/components/dialogs/lead-dialog";
 import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
-import { cn } from "@/lib/utils";
 
 // Helper function to format date to local YYYY-MM-DD without timezone issues
 const formatDateToLocal = (date: Date): string => {
@@ -60,34 +40,6 @@ const formatDateToLocal = (date: Date): string => {
 const getSharedAssigneeNames = (lead: Lead): string[] =>
   (lead.additionalAssignees || []).map((staff) => staff.name);
 
-const getLeadAssignmentSummary = (lead: Lead): string => {
-  const sharedNames = getSharedAssigneeNames(lead);
-
-  if (!lead.assignedTo && sharedNames.length === 0) {
-    return 'Unassigned';
-  }
-
-  if (lead.assignedTo && sharedNames.length === 0) {
-    return lead.assignedTo.name;
-  }
-
-  if (!lead.assignedTo && sharedNames.length > 0) {
-    return `Shared with ${sharedNames.join(', ')}`;
-  }
-
-  return `${lead.assignedTo?.name} + ${sharedNames.length} shared`;
-};
-
-// Define allowed status transitions
-const STAFF_ALLOWED_TRANSITIONS: Record<LeadStatus, LeadStatus[]> = {
-  'new': ['follow_up', 'not_interested'],
-  'follow_up': ['not_interested', 'quotation_sent', 'converted', 'lost'],
-  'not_interested': [], // Terminal status
-  'quotation_sent': ['follow_up', 'converted', 'lost'],
-  'converted': [], // Terminal status
-  'lost': [], // Terminal status
-};
-
 const DEFAULT_STATUSES: LeadStatus[] = ['new'];
 
 interface LeadsPageProps {
@@ -97,275 +49,6 @@ interface LeadsPageProps {
   readonly testId: string;
   readonly initialStatus?: LeadStatus | LeadStatus[]; // Optional initial status filter
 }
-
-interface DraggableLeadCardProps {
-  lead: Lead;
-  onCall: (lead: Lead) => void;
-  onMeeting: (lead: Lead) => void;
-  onQuotation: (lead: Lead) => void;
-  onWhatsApp: (lead: Lead, e?: React.MouseEvent) => void;
-  onView: (lead: Lead) => void;
-  onDelete?: (lead: Lead) => void;
-  onAssign?: (lead: Lead) => void;
-  isUpdating?: boolean;
-  userRole: 'admin' | 'staff';
-}
-
-const DraggableLeadCard = ({
-  lead,
-  onCall,
-  onMeeting,
-  onQuotation,
-  onWhatsApp,
-  onView,
-  isUpdating = false,
-  userRole,
-}: DraggableLeadCardProps) => {
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
-    id: lead._id,
-    disabled: isUpdating, // Disable dragging while updating
-  });
-
-  const style = {
-    transform: CSS.Transform.toString(transform),
-    transition,
-    opacity: isDragging ? 0.6 : isUpdating ? 0.8 : 1,
-    zIndex: isDragging ? 1000 : 'auto',
-  };
-
-  return (
-    <Card
-      ref={setNodeRef}
-      style={style}
-      className={cn(
-        !isUpdating ? 'cursor-grab active:cursor-grabbing' : 'cursor-not-allowed',
-        'hover:shadow-md transition-all duration-200 ease-in-out',
-        'bg-card border border-border hover:border-border',
-        isDragging ? 'shadow-xl rotate-1 scale-102' : 'hover:scale-[1.01]',
-        isUpdating ? 'ring-1 ring-blue-200 ring-opacity-50' : ''
-      )}
-      onClick={() => !isUpdating && onView(lead)}
-      {...(!isUpdating ? attributes : {})}
-      {...(!isUpdating ? listeners : {})}
-    >
-      <CardContent className="p-2 sm:p-3">
-        <div className="space-y-2">
-          <div>
-            <div className="flex items-center justify-between">
-              <h5 className="font-medium text-foreground text-xs sm:text-sm leading-tight truncate pr-1">{getLeadName(lead)}</h5>
-              {isUpdating && (
-                <div className="w-3 h-3 border border-blue-600 border-t-transparent rounded-full animate-spin flex-shrink-0"></div>
-              )}
-            </div>
-            <p className="text-xs text-muted-foreground truncate">
-              {getLeadLocation(lead) || 'No location'}
-            </p>
-            {userRole === 'admin' && (
-              <p className="text-xs text-muted-foreground truncate">
-                {getLeadAssignmentSummary(lead)}
-              </p>
-            )}
-          </div>
-
-          {getLeadMobile(lead) && (
-            <p className="text-xs text-muted-foreground font-mono bg-muted px-1 py-0.5 rounded text-center">
-              {getLeadMobile(lead)}
-            </p>
-          )}
-
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pt-1 border-t border-border">
-            <div className="flex items-center gap-1 flex-wrap">
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onCall(lead);
-                      }}
-                      className="h-6 w-6 sm:h-5 sm:w-5 p-0 text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-950"
-                      disabled={isUpdating}
-                    >
-                      <Phone className="h-3 w-3 sm:h-2.5 sm:w-2.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Call</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onMeeting(lead);
-                      }}
-                      className="h-6 w-6 sm:h-5 sm:w-5 p-0 text-purple-600 hover:text-purple-700 hover:bg-purple-50 dark:hover:bg-purple-950"
-                      disabled={isUpdating}
-                    >
-                      <CalendarIcon className="h-3 w-3 sm:h-2.5 sm:w-2.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Meeting</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onQuotation(lead);
-                      }}
-                      className="h-6 w-6 sm:h-5 sm:w-5 p-0 text-orange-600 hover:text-orange-700 hover:bg-orange-50 dark:hover:bg-orange-950"
-                      disabled={isUpdating}
-                    >
-                      <FileText className="h-3 w-3 sm:h-2.5 sm:w-2.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>Quote</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        onWhatsApp(lead, e);
-                      }}
-                      className="h-6 w-6 sm:h-5 sm:w-5 p-0 text-emerald-600 hover:text-emerald-700 hover:bg-emerald-50 dark:hover:bg-emerald-950"
-                      disabled={isUpdating}
-                    >
-                      <FaWhatsapp className="h-3 w-3 sm:h-2.5 sm:w-2.5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    <p>WhatsApp</p>
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            </div>
-          </div>
-        </div>
-      </CardContent>
-    </Card>
-  );
-};
-
-interface DroppableColumnProps {
-  title: string;
-  status: LeadStatus;
-  leads: Lead[];
-  onCall: (lead: Lead) => void;
-  onMeeting: (lead: Lead) => void;
-  onQuotation: (lead: Lead) => void;
-  onWhatsApp: (lead: Lead, e?: React.MouseEvent) => void;
-  onView: (lead: Lead) => void;
-  onDelete?: (lead: Lead) => void;
-  onAssign?: (lead: Lead) => void;
-  updatingLeads: Set<string>;
-  userRole: 'admin' | 'staff';
-}
-
-const DroppableColumn = ({
-  title,
-  status,
-  leads,
-  onCall,
-  onMeeting,
-  onQuotation,
-  onWhatsApp,
-  onView,
-  onDelete,
-  onAssign,
-  updatingLeads,
-  userRole,
-}: DroppableColumnProps) => {
-  const { isOver, setNodeRef } = useDroppable({
-    id: status,
-  });
-
-  return (
-    <div className="flex flex-col h-full">
-      <div className="flex items-center justify-between mb-4 px-2">
-        <h4 className="font-semibold text-foreground text-sm uppercase tracking-wide">{title}</h4>
-        <span className="text-xs text-muted-foreground bg-card px-2 py-1 rounded-full border border-border shadow-sm">
-          {leads.length}
-        </span>
-      </div>
-
-      <div
-        ref={setNodeRef}
-        className={`
-          flex-1 p-2 rounded-lg transition-all duration-200 ease-in-out overflow-y-auto scrollbar-hide
-          ${isOver
-            ? 'bg-blue-50 dark:bg-blue-950 border-2 border-blue-300 dark:border-blue-700 border-dashed shadow-inner'
-            : 'bg-muted/30 border border-border'
-          }
-        `}
-        style={{
-          maxHeight: '50vh',
-          minHeight: '250px',
-          scrollbarWidth: 'none', /* Firefox */
-          msOverflowStyle: 'none' /* IE and Edge */
-        }}
-      >
-        <SortableContext
-          items={leads.map(lead => lead._id)}
-          strategy={verticalListSortingStrategy}
-        >
-          <div className="space-y-3">
-            {leads.map((lead) => (
-              <DraggableLeadCard
-                key={lead._id}
-                lead={lead}
-                onCall={onCall}
-                onMeeting={onMeeting}
-                onQuotation={onQuotation}
-                onWhatsApp={onWhatsApp}
-                onView={onView}
-                onDelete={onDelete}
-                onAssign={onAssign}
-                isUpdating={updatingLeads.has(lead._id)}
-                userRole={userRole}
-              />
-            ))}
-            {leads.length === 0 && (
-              <div className="text-center py-8 text-muted-foreground text-sm">
-                {isOver ? 'Drop lead here' : 'No leads'}
-              </div>
-            )}
-          </div>
-        </SortableContext>
-      </div>
-    </div>
-  );
-};
 
 export default function LeadsPage({
   userRole,
@@ -381,9 +64,6 @@ export default function LeadsPage({
   const [debouncedSearchTerm, setDebouncedSearchTerm] = useState("");
   const [currentPage, setCurrentPage] = useState(1);
   const [pageSize, setPageSize] = useState(10);
-  const [activeLead, setActiveLead] = useState<Lead | null>(null);
-  const [updatingLeads, setUpdatingLeads] = useState<Set<string>>(new Set());
-  const [activeTab, setActiveTab] = useState("table");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
   const [leadToDelete, setLeadToDelete] = useState<Lead | null>(null);
@@ -412,7 +92,6 @@ export default function LeadsPage({
     error,
     pagination,
     fetchLeads,
-    updateLeadStatusOptimistic,
     deleteLead,
   } = useLeadStore();
   const { user } = useAuthStore();
@@ -420,14 +99,6 @@ export default function LeadsPage({
   const { users: staffMembers, getAllStaff } = useUserStore();
   const navigate = useNavigate();
   const { toast } = useToast();
-
-  const sensors = useSensors(
-    useSensor(PointerSensor, {
-      activationConstraint: {
-        distance: 8,
-      },
-    })
-  );
 
   // Fetch leads on component mount and when filters change
   useEffect(() => {
@@ -626,89 +297,6 @@ export default function LeadsPage({
     setCurrentPage(1);
   };
 
-  const isTransitionAllowed = (fromStatus: LeadStatus, toStatus: LeadStatus): boolean => {
-    if (userRole === 'admin') {
-      return true;
-    }
-    return STAFF_ALLOWED_TRANSITIONS[fromStatus]?.includes(toStatus) || false;
-  };
-
-  const handleDragStart = (event: DragStartEvent) => {
-    const lead = leads.find((l) => l._id === event.active.id);
-    setActiveLead(lead || null);
-  };
-
-  const handleDragEnd = async (event: DragEndEvent) => {
-    const { active, over } = event;
-    setActiveLead(null);
-
-    if (!over || active.id === over.id) {
-      return;
-    }
-
-    const leadId = active.id as string;
-    const newStatus = over.id as LeadStatus;
-    const lead = leads.find((l) => l._id === leadId);
-
-    if (!lead) {
-      toast({
-        title: "Error",
-        description: "Lead not found",
-        variant: "destructive",
-      });
-      return;
-    }
-
-    if (!isTransitionAllowed(lead.status, newStatus)) {
-      toast({
-        title: "Invalid Move",
-        description: `Cannot move lead from ${lead.status.replace('_', ' ')} to ${newStatus.replace('_', ' ')}`,
-        variant: "destructive",
-      });
-      return;
-    }
-
-    setUpdatingLeads(prev => new Set(prev).add(leadId));
-
-    try {
-      const { success, error: optError } = await updateLeadStatusOptimistic(leadId, newStatus);
-
-      if (success) {
-        toast({
-          title: "Success",
-          description: `Lead status updated to ${newStatus.replace('_', ' ')}`,
-        });
-      } else {
-        let message = optError;
-        if (!message) {
-          try {
-            await updateLeadApi(leadId, { status: newStatus });
-          } catch (e) {
-            message = e instanceof Error ? e.message : 'Failed to update lead status';
-          }
-        }
-        toast({
-          title: "Invalid Move",
-          description: message || 'Failed to update lead status',
-          variant: "destructive",
-        });
-      }
-    } catch (error) {
-      console.error('Error updating lead status:', error);
-      toast({
-        title: "Error",
-        description: "Failed to update lead status",
-        variant: "destructive",
-      });
-    } finally {
-      setUpdatingLeads(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(leadId);
-        return newSet;
-      });
-    }
-  };
-
   const columns = [
     {
       key: 'name',
@@ -893,103 +481,6 @@ export default function LeadsPage({
     </div>
   );
 
-  // Kanban columns for lead statuses
-  const kanbanColumns = [
-    { id: 'new', title: 'New', status: 'new' as const },
-    { id: 'follow_up', title: 'Follow Up', status: 'follow_up' as const },
-    { id: 'not_interested', title: 'Not Interested', status: 'not_interested' as const },
-    { id: 'quotation_sent', title: 'Quotation Sent', status: 'quotation_sent' as const },
-    { id: 'converted', title: 'Converted', status: 'converted' as const },
-    { id: 'lost', title: 'Lost', status: 'lost' as const },
-  ];
-
-  const KanbanBoard = ({
-    leads,
-    sensors,
-    handleDragStart,
-    handleDragEnd,
-    handleCall,
-    handleMeeting,
-    handleQuotation,
-    handleWhatsApp,
-    handleView,
-    handleDelete,
-    handleAssign,
-    updatingLeads,
-    userRole,
-    activeLead
-  }: {
-    leads: Lead[];
-    sensors: ReturnType<typeof useSensors>;
-    handleDragStart: (event: DragStartEvent) => void;
-    handleDragEnd: (event: DragEndEvent) => void;
-    handleCall: (lead: Lead) => void;
-    handleMeeting: (lead: Lead) => void;
-    handleQuotation: (lead: Lead) => void;
-    handleWhatsApp: (lead: Lead, e?: React.MouseEvent) => void;
-    handleView: (lead: Lead) => void;
-    handleDelete?: (lead: Lead) => void;
-    handleAssign?: (lead: Lead) => void;
-    updatingLeads: Set<string>;
-    userRole: 'admin' | 'staff';
-    activeLead: Lead | null;
-  }) => {
-    return (
-      <div className="w-full">
-        <DndContext
-          sensors={sensors}
-          collisionDetection={closestCenter}
-          onDragStart={handleDragStart}
-          onDragEnd={handleDragEnd}
-        >
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-3 h-full min-h-[400px] w-full">
-            {kanbanColumns.map((column) => {
-              const columnLeads = leads?.filter(lead => lead.status === column.status) || [];
-
-              return (
-                <DroppableColumn
-                  key={column.id}
-                  title={column.title}
-                  status={column.status}
-                  leads={columnLeads}
-                  onCall={handleCall}
-                  onMeeting={handleMeeting}
-                  onQuotation={handleQuotation}
-                  onWhatsApp={handleWhatsApp}
-                  onView={handleView}
-                  onDelete={userRole === 'admin' ? handleDelete : undefined}
-                  onAssign={userRole === 'admin' ? handleAssign : undefined}
-                  updatingLeads={updatingLeads}
-                  userRole={userRole}
-                />
-              );
-            })}
-          </div>
-
-          <DragOverlay>
-            {activeLead ? (
-              <Card className="opacity-95 shadow-2xl border-2 border-blue-300 bg-white transform rotate-3 scale-105">
-                <CardContent className="p-4">
-                  <div className="space-y-2">
-                    <h5 className="font-semibold text-foreground text-sm">{getLeadName(activeLead)}</h5>
-                    <p className="text-xs text-muted-foreground">
-                      {getLeadLocation(activeLead) || 'No location'}
-                    </p>
-                    {getLeadMobile(activeLead) && (
-                      <p className="text-xs text-muted-foreground font-mono bg-gray-50 px-2 py-1 rounded">
-                        {getLeadMobile(activeLead)}
-                      </p>
-                    )}
-                  </div>
-                </CardContent>
-              </Card>
-            ) : null}
-          </DragOverlay>
-        </DndContext>
-      </div>
-    );
-  };
-
 
   // All available status options
   const allStatuses: { value: LeadStatus; label: string }[] = [
@@ -998,6 +489,7 @@ export default function LeadsPage({
     { value: 'not_interested', label: 'Not Interested' },
     { value: 'quotation_sent', label: 'Quotation Sent' },
     { value: 'converted', label: 'Converted' },
+    { value: 'completed', label: 'Completed' },
     { value: 'lost', label: 'Lost' },
   ];
 
@@ -1430,29 +922,26 @@ export default function LeadsPage({
 
         <Card>
           <CardContent className="p-1 sm:p-2 lg:p-3">
-            <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-4">
+            <Tabs value="table" className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                <TabsList className="grid w-full grid-cols-2 sm:w-auto">
+                <TabsList className="grid w-full grid-cols-1 sm:w-auto">
                   <TabsTrigger value="table" className="text-xs sm:text-sm">Table View</TabsTrigger>
-                  <TabsTrigger value="kanban" className="text-xs sm:text-sm">Kanban View</TabsTrigger>
                 </TabsList>
 
-                {activeTab === "table" && (
-                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
-                    <span className="text-xs sm:text-sm text-muted-foreground">Rows per page:</span>
-                    <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
-                      <SelectTrigger className="w-full sm:w-auto min-w-[80px] h-8 px-2">
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent className="w-fit min-w-[46px]">
-                        <SelectItem value="5">5</SelectItem>
-                        <SelectItem value="10">10</SelectItem>
-                        <SelectItem value="20">20</SelectItem>
-                        <SelectItem value="30">30</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                )}
+                <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2">
+                  <span className="text-xs sm:text-sm text-muted-foreground">Rows per page:</span>
+                  <Select value={pageSize.toString()} onValueChange={(value) => handlePageSizeChange(Number(value))}>
+                    <SelectTrigger className="w-full sm:w-auto min-w-[80px] h-8 px-2">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent className="w-fit min-w-[46px]">
+                      <SelectItem value="5">5</SelectItem>
+                      <SelectItem value="10">10</SelectItem>
+                      <SelectItem value="20">20</SelectItem>
+                      <SelectItem value="30">30</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
               </div>
 
               <TabsContent value="table">
@@ -1477,31 +966,6 @@ export default function LeadsPage({
                   onToggleRowSelection={handleToggleLeadSelection}
                   onToggleAllRows={handleToggleAllLeadSelections}
                 />
-              </TabsContent>
-
-              <TabsContent value="kanban">
-                {loading ? (
-                  <div className="flex items-center justify-center h-64">
-                    <div className="text-muted-foreground">Loading...</div>
-                  </div>
-                ) : (
-                  <KanbanBoard
-                    leads={leads || []}
-                    sensors={sensors}
-                    handleDragStart={handleDragStart}
-                    handleDragEnd={handleDragEnd}
-                    handleCall={handleCall}
-                    handleMeeting={handleMeeting}
-                    handleQuotation={handleQuotation}
-                    handleWhatsApp={handleWhatsApp}
-                    handleView={handleView}
-                    handleDelete={userRole === 'admin' ? handleDelete : undefined}
-                    handleAssign={userRole === 'admin' ? handleAssign : undefined}
-                    updatingLeads={updatingLeads}
-                    userRole={userRole}
-                    activeLead={activeLead}
-                  />
-                )}
               </TabsContent>
             </Tabs>
           </CardContent>
