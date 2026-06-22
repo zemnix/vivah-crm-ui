@@ -25,17 +25,40 @@ const createEmptyItem = (): LeadProductionItem => ({
   postProductionQuantity: '',
 });
 
-const createEmptyGroup = (): LeadProductionGroup => ({
-  name: '',
+const DEFAULT_PRODUCTION_NAMES = [
+  'Tent supply',
+  'Tent Worker',
+  'Tent Labour',
+  'Flowers',
+  'Florist',
+  'Purchase',
+  'New makings',
+  'Light',
+  'Sound',
+  'Flex & Print',
+  'Misc.',
+  'DG & Fuel',
+  'Dj player',
+  'Anchor',
+];
+
+const createEmptyGroup = (name = ''): LeadProductionGroup => ({
+  name,
   items: [createEmptyItem()],
 });
 
+const createDefaultProductionGroups = (): LeadProductionGroup[] =>
+  DEFAULT_PRODUCTION_NAMES.map((name) => createEmptyGroup(name));
+
 const ensureRenderableSheet = (sheet: LeadProductionSheet): LeadProductionSheet => ({
   ...sheet,
-  productions: sheet.productions.map((group) => ({
-    ...group,
-    items: group.items.length > 0 ? group.items : [createEmptyItem()],
-  })),
+  productions:
+    sheet.productions.length > 0
+      ? sheet.productions.map((group) => ({
+        ...group,
+        items: group.items.length > 0 ? group.items : [createEmptyItem()],
+      }))
+      : createDefaultProductionGroups(),
 });
 
 const toDateInputValue = (value: string | null | undefined): string => {

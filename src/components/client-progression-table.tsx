@@ -90,6 +90,8 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
       return [];
     }
 
+    const leadVenue = lead.customer?.venueName?.trim() || '';
+
     return lead.typesOfEvent.map((event) => {
       // Find existing progression for this event
       const eventDateStr = format(new Date(event.date), 'yyyy-MM-dd');
@@ -99,7 +101,10 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
       );
 
       if (existing) {
-        return existing;
+        return {
+          ...existing,
+          venue: existing.venue?.trim() ? existing.venue : leadVenue,
+        };
       }
 
       // Return a new progression object with defaults (not yet saved)
@@ -108,7 +113,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
         leadId: lead._id,
         eventName: event.name,
         eventDate: event.date,
-        venue: '',
+        venue: leadVenue,
         status: 'Booked' as EventStatus,
         ppt: 'Not started' as ProgressionStatus,
         site: 'Not started' as ProgressionStatus,
@@ -124,7 +129,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
         updatedAt: new Date().toISOString(),
       } as ClientProgression;
     });
-  }, [lead?._id, lead?.typesOfEvent, progressions, initialized]);
+  }, [lead?._id, lead?.typesOfEvent, lead.customer?.venueName, progressions, initialized]);
 
   const handleFieldChange = async (
     progression: ClientProgression,
