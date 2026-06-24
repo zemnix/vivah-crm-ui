@@ -69,7 +69,8 @@ const TodoFilterBar = ({
   setViewFilter,
   setStatusFilter,
   handleDateRangeChange,
-  resetFilters
+  resetFilters,
+  isAdmin
 }: {
   viewFilter: TodoView;
   statusFilter: TodoStatusFilter;
@@ -83,6 +84,7 @@ const TodoFilterBar = ({
   setStatusFilter: (value: TodoStatusFilter) => void;
   handleDateRangeChange: (from: string, to: string) => void;
   resetFilters: () => void;
+  isAdmin: boolean;
 }) => (
   <div className="bg-card border border-border rounded-lg shadow-sm mb-4">
     <div className="flex flex-col sm:flex-row sm:items-center justify-between p-3 sm:p-4 pb-2 gap-2">
@@ -93,7 +95,7 @@ const TodoFilterBar = ({
         </div>
         <div className="flex items-center gap-2 flex-wrap">
           <Badge variant="outline" className="text-xs font-medium">
-            {viewFilter === 'all' ? 'Assigned + Created' : viewFilter === 'assigned' ? 'Assigned To Me' : 'Created By Me'}
+            {viewFilter === 'all' ? (isAdmin ? 'All Todos' : 'Assigned + Created') : viewFilter === 'assigned' ? 'Assigned To Me' : 'Created By Me'}
           </Badge>
           <Badge variant="outline" className="text-xs font-medium">
             {statusFilter === 'all' ? 'All statuses' : statusFilter}
@@ -163,7 +165,7 @@ const TodoFilterBar = ({
                 <SelectValue placeholder="View" />
               </SelectTrigger>
               <SelectContent>
-                <SelectItem value="all">Assigned + Created</SelectItem>
+                <SelectItem value="all">{isAdmin ? 'All Todos' : 'Assigned + Created'}</SelectItem>
                 <SelectItem value="assigned">Assigned To Me</SelectItem>
                 <SelectItem value="created">Created By Me</SelectItem>
               </SelectContent>
@@ -605,6 +607,7 @@ export default function TodosPage({
           }}
           handleDateRangeChange={handleDateRangeChange}
           resetFilters={resetFilters}
+          isAdmin={userRole === 'admin'}
         />
 
         <Card>
