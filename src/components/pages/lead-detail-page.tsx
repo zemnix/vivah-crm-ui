@@ -26,6 +26,7 @@ import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmati
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
 import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
 import { ClientProgressionTable } from "@/components/client-progression-table";
+import { SiteInspectionTable } from "@/components/site-inspection-table";
 import { ProductionTable } from "@/components/production-table";
 
 interface LeadDetailPageProps {
@@ -790,6 +791,9 @@ export default function LeadDetailPage({
             {/* Client Progression - Only for converted/completed leads */}
             {lead && ['converted', 'completed'].includes(lead.status) && (
               <ClientProgressionTable lead={lead} />
+            )}
+            {lead && ['converted', 'completed'].includes(lead.status) && (
+              <SiteInspectionTable lead={lead} />
             )}
             {lead && ['converted', 'completed'].includes(lead.status) && (
               <ProductionTable lead={lead} />

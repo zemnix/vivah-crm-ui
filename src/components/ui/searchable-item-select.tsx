@@ -33,6 +33,7 @@ export function SearchableItemSelect({
   const [selectedItem, setSelectedItem] = useState<Item | null>(null);
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [activeIndex, setActiveIndex] = useState(-1);
   const [dropdownPosition, setDropdownPosition] = useState<{
     top: number;
     left: number;
@@ -42,11 +43,24 @@ export function SearchableItemSelect({
   const searchTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const inputRef = useRef<HTMLInputElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+  const optionRefs = useRef<Array<HTMLElement | null>>([]);
 
   const normalizedSearchTerm = searchTerm.trim();
   const hasExactMatch = items.some(
     (item) => item.name.trim().toLowerCase() === normalizedSearchTerm.toLowerCase()
   );
+  const canCreate = !loading && normalizedSearchTerm.length >= 3 && !hasExactMatch;
+  const optionCount = items.length + (canCreate ? 1 : 0);
+
+  useEffect(() => {
+    setActiveIndex(-1);
+  }, [normalizedSearchTerm, items]);
+
+  useEffect(() => {
+    if (activeIndex >= 0) {
+      optionRefs.current[activeIndex]?.scrollIntoView({ block: 'nearest' });
+    }
+  }, [activeIndex]);
 
   const updateDropdownPosition = useCallback(() => {
     if (!inputRef.current) {
@@ -252,6 +266,37 @@ export function SearchableItemSelect({
     }
   }, [creating, normalizedSearchTerm, handleItemSelect, toast]);
 
+  const handleKeyDown = useCallback((event: React.KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === 'Escape') {
+      setOpen(false);
+      setActiveIndex(-1);
+      return;
+    }
+
+    if (event.key !== 'ArrowDown' && event.key !== 'ArrowUp' && event.key !== 'Enter') return;
+    if (!open || optionCount === 0) return;
+
+    event.preventDefault();
+
+    if (event.key === 'ArrowDown') {
+      setActiveIndex((current) => (current + 1) % optionCount);
+      return;
+    }
+
+    if (event.key === 'ArrowUp') {
+      setActiveIndex((current) => (current <= 0 ? optionCount - 1 : current - 1));
+      return;
+    }
+
+    if (activeIndex < 0) return;
+    if (canCreate && activeIndex === 0) {
+      void handleCreateItem();
+      return;
+    }
+    const item = items[activeIndex - (canCreate ? 1 : 0)];
+    if (item) handleItemSelect(item);
+  }, [activeIndex, canCreate, handleCreateItem, handleItemSelect, items, open, optionCount]);
+
   return (
     <div className={cn('relative', className)}>
       <div className="relative">
@@ -261,6 +306,7 @@ export function SearchableItemSelect({
           value={displayValue}
           onChange={handleInputChange}
           onFocus={handleInputFocus}
+          onKeyDown={handleKeyDown}
           readOnly={disabled}
           className="pr-16"
         />
@@ -302,15 +348,20 @@ export function SearchableItemSelect({
             <div className="px-2 pt-2 text-sm text-muted-foreground text-center">No items found</div>
           )}
 
-          {!loading && normalizedSearchTerm.length >= 3 && !hasExactMatch && (
+          {canCreate && (
             <div className="p-2">
               <button
+                ref={(element) => { optionRefs.current[0] = element; }}
                 type="button"
                 onClick={() => {
                   void handleCreateItem();
                 }}
+                onMouseEnter={() => setActiveIndex(0)}
                 disabled={creating}
-                className="w-full px-3 py-2 text-sm text-left rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-70 transition-colors"
+                className={cn(
+                  "w-full px-3 py-2 text-sm text-left rounded-sm bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-70 transition-colors",
+                  activeIndex === 0 && "ring-2 ring-ring ring-offset-1"
+                )}
               >
                 Create "{normalizedSearchTerm}"
               </button>
@@ -319,11 +370,18 @@ export function SearchableItemSelect({
 
           {items.length > 0 && (
             <div className="p-1">
-              {items.map((item) => (
+              {items.map((item, itemIndex) => {
+                const optionIndex = itemIndex + (canCreate ? 1 : 0);
+                return (
                 <div
                   key={item._id}
-                  className="flex items-center justify-between p-2 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer"
+                  ref={(element) => { optionRefs.current[optionIndex] = element; }}
+                  className={cn(
+                    "flex items-center justify-between p-2 rounded-sm hover:bg-accent hover:text-accent-foreground cursor-pointer",
+                    activeIndex === optionIndex && "bg-accent text-accent-foreground"
+                  )}
                   onClick={() => handleItemSelect(item)}
+                  onMouseEnter={() => setActiveIndex(optionIndex)}
                 >
                   <div className="font-medium text-sm truncate">{item.name}</div>
                   <Check
@@ -333,7 +391,8 @@ export function SearchableItemSelect({
                     )}
                   />
                 </div>
-              ))}
+                );
+              })}
             </div>
           )}
         </div>,
