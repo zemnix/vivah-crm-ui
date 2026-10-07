@@ -17,8 +17,11 @@ import {
 } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { getLeadsApi, Lead, TypeOfEvent } from '@/api/leadApi';
+import { getTithisApi } from '@/api/tithiApi';
 import { EventDetailsDialog } from './dialogs/event-details-dialog';
+import { MarkTithiDialog } from './dialogs/mark-tithi-dialog';
 import { Button } from '@/components/ui/button';
+import { useAuthStore } from '@/store/authStore';
 
 interface EventDetail {
   eventName: string;
@@ -34,10 +37,12 @@ const WEEKDAYS = ['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'];
 function CalendarGrid({
   month,
   eventsByDate,
+  tithiDates,
   onDateClick,
 }: {
   month: Date;
   eventsByDate: Map<string, EventDetail[]>;
+  tithiDates: Set<string>;
   onDateClick: (date: Date) => void;
 }) {
   // Generate all days to display (including days from prev/next month to fill the grid)
@@ -88,6 +93,7 @@ function CalendarGrid({
             const dateKey = format(startOfDay(date), 'yyyy-MM-dd');
             const events = eventsByDate.get(dateKey) || [];
             const hasEvents = events.length > 0;
+            const isTithi = tithiDates.has(dateKey);
             const isCurrentMonth = isSameMonth(date, month);
             const isTodayDate = isToday(date);
 
@@ -99,7 +105,8 @@ function CalendarGrid({
                   "relative w-full min-h-[80px] p-1 border-t border-l first:border-l-0 flex flex-col items-center transition-colors hover:bg-accent/50",
                   !isCurrentMonth && "bg-muted/20 text-muted-foreground",
                   hasEvents && isCurrentMonth && "bg-primary/5",
-                  isTodayDate && "bg-accent/50"
+                  isTodayDate && "bg-accent/50",
+                  isTithi && "bg-emerald-200 text-emerald-950 hover:bg-emerald-300 dark:bg-emerald-950 dark:text-emerald-100 dark:hover:bg-emerald-900"
                 )}
               >
                 <span
@@ -115,7 +122,7 @@ function CalendarGrid({
                     {events.slice(0, 2).map((event, idx) => (
                       <div
                         key={idx}
-                        className="w-full truncate text-[9px] px-1 py-0.5 rounded font-medium bg-primary/20 text-primary"
+                        className="w-full truncate text-[9px] px-1 py-0.5 rounded font-medium bg-primary/15 text-primary dark:bg-primary/30 dark:text-foreground"
                         title={`${event.eventName} - ${event.clientName}${event.venueName ? ` - ${event.venueName}` : ''}`}
                       >
                         <span className="truncate block font-semibold">{event.eventName}</span>
@@ -143,9 +150,13 @@ function CalendarGrid({
 
 export function EventsCalendar() {
   const [eventsByDate, setEventsByDate] = useState<Map<string, EventDetail[]>>(new Map());
+  const [tithiDates, setTithiDates] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<Date | null>(null);
   const [selectedDateEvents, setSelectedDateEvents] = useState<EventDetail[]>([]);
+  const [isMarkTithiDialogOpen, setIsMarkTithiDialogOpen] = useState(false);
+  const { user } = useAuthStore();
+  const isAdmin = user?.role === 'admin';
 
   // Get current month and next month
   const [baseMonth, setBaseMonth] = useState<Date>(() => startOfMonth(new Date()));
@@ -158,11 +169,14 @@ export function EventsCalendar() {
       setLoading(true);
       try {
         // Fetch all active client/event leads
-        const response = await getLeadsApi({
-          status: ['converted', 'completed'],
-          limit: 1000,
-          includeAllEventsForCalendar: true,
-        });
+        const [response, tithis] = await Promise.all([
+          getLeadsApi({
+            status: ['converted', 'completed'],
+            limit: 1000,
+            includeAllEventsForCalendar: true,
+          }),
+          getTithisApi(),
+        ]);
 
         // Process events and group by date
         const eventsMap = new Map<string, EventDetail[]>();
@@ -189,6 +203,7 @@ export function EventsCalendar() {
         });
 
         setEventsByDate(eventsMap);
+        setTithiDates(new Set(tithis.map((tithi) => tithi.date)));
       } catch (error) {
         console.error('Failed to fetch events:', error);
       } finally {
@@ -222,6 +237,16 @@ export function EventsCalendar() {
               </CardDescription>
             </div>
             <div className="flex items-center gap-2">
+              {isAdmin && (
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setIsMarkTithiDialogOpen(true)}
+                >
+                  Mark Tithi
+                </Button>
+              )}
               <Button
                 type="button"
                 variant="outline"
@@ -266,6 +291,7 @@ export function EventsCalendar() {
                 <CalendarGrid
                   month={currentMonth}
                   eventsByDate={eventsByDate}
+                  tithiDates={tithiDates}
                   onDateClick={handleDateClick}
                 />
               </div>
@@ -278,6 +304,7 @@ export function EventsCalendar() {
                 <CalendarGrid
                   month={nextMonth}
                   eventsByDate={eventsByDate}
+                  tithiDates={tithiDates}
                   onDateClick={handleDateClick}
                 />
               </div>
@@ -298,6 +325,15 @@ export function EventsCalendar() {
         date={selectedDate}
         events={selectedDateEvents}
       />
+
+      {isAdmin && (
+        <MarkTithiDialog
+          open={isMarkTithiDialogOpen}
+          onOpenChange={setIsMarkTithiDialogOpen}
+          tithiDates={[...tithiDates]}
+          onSaved={(dates) => setTithiDates(new Set(dates))}
+        />
+      )}
     </>
   );
 }
