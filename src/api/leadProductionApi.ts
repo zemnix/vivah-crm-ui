@@ -19,28 +19,30 @@ export interface LeadProductionGroup {
   items: LeadProductionItem[];
 }
 
+export interface LeadProductionEventSheet {
+  _id?: string;
+  eventName: string;
+  eventDate: string;
+  eventVenue?: string;
+  dates: LeadProductionDateSet;
+  productions: LeadProductionGroup[];
+}
+
 export interface LeadProductionSheet {
   _id?: string;
   leadId: string;
-  dates: LeadProductionDateSet;
-  productions: LeadProductionGroup[];
+  eventSheets: LeadProductionEventSheet[];
   createdAt?: string;
   updatedAt?: string;
 }
 
 export interface LeadProductionUpsertData {
-  dates: LeadProductionDateSet;
-  productions: LeadProductionGroup[];
+  eventSheets: LeadProductionEventSheet[];
 }
 
 export const createEmptyLeadProductionSheet = (leadId: string): LeadProductionSheet => ({
   leadId,
-  dates: {
-    productionDate: null,
-    preProductionDate: null,
-    postProductionDate: null,
-  },
-  productions: [],
+  eventSheets: [],
 });
 
 export const getLeadProductionByLeadIdApi = async (leadId: string): Promise<LeadProductionSheet> => {

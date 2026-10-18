@@ -194,7 +194,7 @@ export function EventsCalendar() {
               eventsMap.get(dateKey)!.push({
                 eventName: event.name,
                 clientName: lead.customer.name,
-                venueName: lead.customer.venueName,
+                venueName: event.eventVenue || lead.customer.venueName,
                 dayNight: event.dayNight,
                 leadId: lead._id,
               });

@@ -70,6 +70,8 @@ export function MarkTithiDialog({
             selected={selectedDates}
             onSelect={(dates) => setSelectedDates(dates || [])}
             captionLayout="dropdown"
+            startMonth={new Date(new Date().getFullYear() - 50, 0)}
+            endMonth={new Date(new Date().getFullYear() + 50, 11)}
             disabled={isSaving}
           />
         </div>

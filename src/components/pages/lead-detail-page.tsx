@@ -735,6 +735,15 @@ export default function LeadDetailPage({
                               </p>
                             </div>
                           </div>
+                          <div className="flex items-center gap-2">
+                            <Building2 className="h-4 w-4 text-muted-foreground" />
+                            <div>
+                              <p className="text-xs text-muted-foreground">Event Venue</p>
+                              <p className="text-foreground font-medium">
+                                {event.eventVenue || 'Not set'}
+                              </p>
+                            </div>
+                          </div>
                         </div>
                       </div>
                     ))}

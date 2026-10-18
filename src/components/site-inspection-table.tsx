@@ -57,6 +57,7 @@ const createDraftInspections = (lead: Lead, savedInspections: SiteInspection[]):
   return (lead.typesOfEvent || [])
     .filter((event) => event.name?.trim() && event.date)
     .map((event, index) => {
+      const eventVenue = event.eventVenue?.trim() || leadVenue;
       const draftBase = {
         event_date: event.date,
         event_type: event.name,
@@ -65,7 +66,7 @@ const createDraftInspections = (lead: Lead, savedInspections: SiteInspection[]):
       if (saved) {
         return {
           ...saved,
-          event_venue: saved.event_venue?.trim() ? saved.event_venue : leadVenue,
+          event_venue: saved.event_venue?.trim() ? saved.event_venue : eventVenue,
           items: saved.items?.length ? saved.items : defaultItems(saved._id),
         };
       }
@@ -73,7 +74,7 @@ const createDraftInspections = (lead: Lead, savedInspections: SiteInspection[]):
         _id: `temp-site-inspection-${index}`,
         lead_id: lead._id,
         event_date: event.date,
-        event_venue: leadVenue,
+        event_venue: eventVenue,
         event_type: event.name,
         venue_floor: '',
         visited_date: null,

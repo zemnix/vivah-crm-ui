@@ -22,7 +22,7 @@ import { Loader, Plus, X } from "lucide-react";
 
 // Convert enquiry form schema
 // Note: name and numberOfGuests come from enquiry and are read-only
-// Only date and dayNight are editable
+// Date, venue, and day/night are editable
 const createConvertEnquirySchema = () => {
   return z.object({
     assignedTo: z.string().optional(),
@@ -30,6 +30,7 @@ const createConvertEnquirySchema = () => {
       z.object({
         name: z.string().min(1, "Event name is required"), // Read-only from enquiry
         date: z.string().optional().or(z.literal("")), // Editable
+        eventVenue: z.string().max(200, "Event venue must be less than 200 characters").optional().or(z.literal("")),
         dayNight: z.enum(['day', 'night', 'both']), // Editable
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"), // Read-only from enquiry
       })
@@ -90,6 +91,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
         typesOfEvent: enquiry.typesOfEvent.map(event => ({
           name: event.name, // From enquiry - read-only
           date: "", // Optional
+          eventVenue: "",
           dayNight: 'both' as const, // Default - editable
           numberOfGuests: event.numberOfGuests, // From enquiry - read-only
         })),
@@ -161,6 +163,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
         typesOfEvent: data.typesOfEvent.map(event => ({
           name: event.name, // Backend will use enquiry's value, but we send it for matching
           ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
+          ...(event.eventVenue?.trim() ? { eventVenue: event.eventVenue.trim() } : {}),
           dayNight: event.dayNight,
           numberOfGuests: event.numberOfGuests, // Backend will use enquiry's value, but we send it for matching
         })),
@@ -278,7 +281,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                 <div>
                   <h3 className="text-lg font-semibold">Event Details</h3>
                   <p className="text-sm text-muted-foreground mt-1">
-                    Event names and guest counts are from the enquiry. Please add dates and day/night preferences.
+                    Event names and guest counts are from the enquiry. Please add dates, venues, and day/night preferences.
                   </p>
                 </div>
               </div>
@@ -351,6 +354,20 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                               }}
                               placeholder="Pick a date"
                             />
+                          </FormControl>
+                          <FormMessage />
+                        </FormItem>
+                      )}
+                    />
+
+                    <FormField
+                      control={form.control}
+                      name={`typesOfEvent.${index}.eventVenue`}
+                      render={({ field }) => (
+                        <FormItem>
+                          <FormLabel>Event Venue</FormLabel>
+                          <FormControl>
+                            <Input placeholder="Enter event venue" {...field} />
                           </FormControl>
                           <FormMessage />
                         </FormItem>

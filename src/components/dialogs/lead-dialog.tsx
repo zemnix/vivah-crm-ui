@@ -44,6 +44,7 @@ const createLeadSchema = () => {
       z.object({
         name: z.string().min(1, "Event name is required"),
         date: z.string().optional().or(z.literal("")),
+        eventVenue: z.string().max(200, "Event venue must be less than 200 characters").optional().or(z.literal("")),
         dayNight: z.enum(['day', 'night', 'both']),
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
       })
@@ -128,6 +129,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
         return {
           name: event.name || "",
           date: eventDate,
+          eventVenue: event.eventVenue || "",
           dayNight: (event.dayNight || 'both') as 'day' | 'night' | 'both',
           numberOfGuests: event.numberOfGuests || 0,
         };
@@ -250,6 +252,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
       const typesOfEventData = data.typesOfEvent?.map(event => ({
         name: event.name,
         ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
+        ...(event.eventVenue?.trim() ? { eventVenue: event.eventVenue.trim() } : {}),
         dayNight: event.dayNight,
         numberOfGuests: event.numberOfGuests,
       }));
@@ -506,6 +509,7 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                         {
                           name: "",
                           date: new Date().toISOString().split('T')[0],
+                          eventVenue: "",
                           dayNight: 'both' as const,
                           numberOfGuests: 0,
                         },
@@ -594,6 +598,20 @@ export function LeadDialog({ open, onOpenChange, lead, mode }: LeadDialogProps) 
                                 placeholder="Pick a date"
                                 disabled={isSubmitting || loading}
                               />
+                            </FormControl>
+                            <FormMessage />
+                          </FormItem>
+                        )}
+                      />
+
+                      <FormField
+                        control={form.control}
+                        name={`typesOfEvent.${index}.eventVenue`}
+                        render={({ field }) => (
+                          <FormItem>
+                            <FormLabel>Event Venue</FormLabel>
+                            <FormControl>
+                              <Input placeholder="Enter event venue" {...field} disabled={isSubmitting || loading} />
                             </FormControl>
                             <FormMessage />
                           </FormItem>

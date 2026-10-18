@@ -15,6 +15,7 @@ export interface Customer {
 export interface TypeOfEvent {
   name: string;
   date: string; // ISO date string
+  eventVenue?: string;
   dayNight: 'day' | 'night' | 'both';
   numberOfGuests: number;
 }

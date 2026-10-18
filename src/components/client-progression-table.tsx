@@ -93,6 +93,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
     const leadVenue = lead.customer?.venueName?.trim() || '';
 
     return lead.typesOfEvent.map((event) => {
+      const eventVenue = event.eventVenue?.trim() || leadVenue;
       // Find existing progression for this event
       const eventDateStr = format(new Date(event.date), 'yyyy-MM-dd');
       const existing = progressions.find(
@@ -103,7 +104,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
       if (existing) {
         return {
           ...existing,
-          venue: existing.venue?.trim() ? existing.venue : leadVenue,
+          venue: existing.venue?.trim() ? existing.venue : eventVenue,
         };
       }
 
@@ -113,7 +114,7 @@ export function ClientProgressionTable({ lead }: ClientProgressionTableProps) {
         leadId: lead._id,
         eventName: event.name,
         eventDate: event.date,
-        venue: leadVenue,
+        venue: eventVenue,
         status: 'Booked' as EventStatus,
         ppt: 'Not started' as ProgressionStatus,
         site: 'Not started' as ProgressionStatus,

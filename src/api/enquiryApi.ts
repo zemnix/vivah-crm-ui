@@ -50,6 +50,7 @@ export interface ConvertEnquiryToLeadData {
   typesOfEvent?: Array<{
     name: string;
     date?: string; // ISO date string
+    eventVenue?: string;
     dayNight: 'day' | 'night' | 'both';
     numberOfGuests: number;
   }>;

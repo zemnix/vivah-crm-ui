@@ -1,11 +1,11 @@
 import jsPDF from 'jspdf';
 import { format } from 'date-fns';
 import type { Lead } from '@/api/leadApi';
-import type { LeadProductionSheet } from '@/api/leadProductionApi';
+import type { LeadProductionEventSheet } from '@/api/leadProductionApi';
 
 interface DownloadProductionPdfOptions {
   lead: Lead;
-  sheet: LeadProductionSheet;
+  sheet: LeadProductionEventSheet;
 }
 
 const formatDate = (value?: string | null) => {
@@ -227,23 +227,8 @@ export const downloadProductionPdf = async ({ lead, sheet }: DownloadProductionP
   doc.setFontSize(11);
   doc.setTextColor(15, 23, 42);
   drawLabelValue('Lead Name', lead.customer?.name || 'N/A');
-  drawLabelValue('Venue', lead.customer?.venueName || 'N/A');
-
-  const eventSummary = (lead.typesOfEvent || []).length
-    ? lead.typesOfEvent!
-        .map((event, index) => {
-          const parts = [
-            `${index + 1}. ${event.name || 'Event'}`,
-            event.date ? formatDate(event.date) : null,
-            event.dayNight ? event.dayNight : null,
-          ].filter(Boolean);
-
-          return parts.join(' | ');
-        })
-        .join('\n')
-    : 'N/A';
-
-  drawLabelValue('Events', eventSummary);
+  drawLabelValue('Event', `${sheet.eventName} | ${formatDate(sheet.eventDate)}`);
+  drawLabelValue('Venue', sheet.eventVenue || lead.customer?.venueName || 'N/A');
   y += 3;
 
   drawTableHeader();

@@ -4,12 +4,13 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useLeadProductionStore } from '@/store/leadProductionStore';
 import {
   createEmptyLeadProductionSheet,
   type LeadProductionGroup,
   type LeadProductionItem,
-  type LeadProductionSheet,
+  type LeadProductionEventSheet,
 } from '@/api/leadProductionApi';
 import type { Lead } from '@/api/leadApi';
 import { Loader2, Plus, Save, Download, Trash2 } from 'lucide-react';
@@ -50,7 +51,9 @@ const createEmptyGroup = (name = ''): LeadProductionGroup => ({
 const createDefaultProductionGroups = (): LeadProductionGroup[] =>
   DEFAULT_PRODUCTION_NAMES.map((name) => createEmptyGroup(name));
 
-const ensureRenderableSheet = (sheet: LeadProductionSheet): LeadProductionSheet => ({
+const eventKey = (eventName: string, eventDate: string) => `${eventName}::${toDateInputValue(eventDate)}`;
+
+const ensureRenderableSheet = (sheet: LeadProductionEventSheet): LeadProductionEventSheet => ({
   ...sheet,
   productions:
     sheet.productions.length > 0
@@ -66,13 +69,18 @@ const toDateInputValue = (value: string | null | undefined): string => {
   return value.includes('T') ? value.split('T')[0] : value;
 };
 
-const toPayload = (sheet: LeadProductionSheet) => ({
-  dates: {
-    productionDate: sheet.dates.productionDate || null,
-    preProductionDate: sheet.dates.preProductionDate || null,
-    postProductionDate: sheet.dates.postProductionDate || null,
-  },
-  productions: sheet.productions.map((group) => ({
+const toPayload = (eventSheets: LeadProductionEventSheet[]) => ({
+  eventSheets: eventSheets.map((sheet) => ({
+    _id: sheet._id,
+    eventName: sheet.eventName,
+    eventDate: sheet.eventDate,
+    eventVenue: sheet.eventVenue || '',
+    dates: {
+      productionDate: sheet.dates.productionDate || null,
+      preProductionDate: sheet.dates.preProductionDate || null,
+      postProductionDate: sheet.dates.postProductionDate || null,
+    },
+    productions: sheet.productions.map((group) => ({
     _id: group._id,
     name: group.name,
     items: group.items.map((item) => ({
@@ -80,6 +88,7 @@ const toPayload = (sheet: LeadProductionSheet) => ({
       name: item.name,
       preProductionQuantity: item.preProductionQuantity,
       postProductionQuantity: item.postProductionQuantity,
+    })),
     })),
   })),
 });
@@ -89,20 +98,46 @@ const softInputClassName =
 
 export function ProductionTable({ lead }: ProductionTableProps) {
   const {
-    selectedSheet,
     loading,
     saving,
     fetchLeadProduction,
     saveLeadProduction,
     reset,
   } = useLeadProductionStore();
-  const [sheet, setSheet] = useState<LeadProductionSheet>(createEmptyLeadProductionSheet(lead._id));
+  const [sheet, setSheet] = useState<LeadProductionEventSheet | null>(null);
+  const [eventSheets, setEventSheets] = useState<LeadProductionEventSheet[]>([]);
+  const [, setSelectedEventKey] = useState('');
   const [pdfGenerating, setPdfGenerating] = useState(false);
-  const sheetRef = useRef(sheet);
+  const sheetRef = useRef<LeadProductionEventSheet | null>(sheet);
+  const eventSheetsRef = useRef<LeadProductionEventSheet[]>([]);
+
+  const getLeadEventSheets = (storedSheets: LeadProductionEventSheet[]) =>
+    (lead.typesOfEvent || [])
+      .filter((event) => event.name?.trim() && event.date)
+      .map((event) => {
+        const key = eventKey(event.name, event.date);
+        const saved = storedSheets.find((sheet) => eventKey(sheet.eventName, sheet.eventDate) === key);
+        return ensureRenderableSheet(saved ? {
+          ...saved,
+          eventName: event.name,
+          eventDate: event.date,
+          eventVenue: event.eventVenue?.trim() || lead.customer?.venueName?.trim() || '',
+        } : {
+          eventName: event.name,
+          eventDate: event.date,
+          eventVenue: event.eventVenue?.trim() || lead.customer?.venueName?.trim() || '',
+          dates: { productionDate: null, preProductionDate: null, postProductionDate: null },
+          productions: [],
+        });
+      });
 
   useEffect(() => {
     sheetRef.current = sheet;
   }, [sheet]);
+
+  useEffect(() => {
+    eventSheetsRef.current = eventSheets;
+  }, [eventSheets]);
 
   useEffect(() => {
     if (!['converted', 'completed'].includes(lead.status)) {
@@ -116,9 +151,13 @@ export function ProductionTable({ lead }: ProductionTableProps) {
       const result = await fetchLeadProduction(lead._id);
       if (!mounted) return;
 
-      const nextSheet = ensureRenderableSheet(result ?? createEmptyLeadProductionSheet(lead._id));
-      setSheet(nextSheet);
-      sheetRef.current = nextSheet;
+      const nextSheets = getLeadEventSheets(result?.eventSheets ?? createEmptyLeadProductionSheet(lead._id).eventSheets);
+      const firstSheet = nextSheets[0] ?? null;
+      setEventSheets(nextSheets);
+      eventSheetsRef.current = nextSheets;
+      setSelectedEventKey(firstSheet ? eventKey(firstSheet.eventName, firstSheet.eventDate) : '');
+      setSheet(firstSheet);
+      sheetRef.current = firstSheet;
     };
 
     load();
@@ -126,36 +165,42 @@ export function ProductionTable({ lead }: ProductionTableProps) {
     return () => {
       mounted = false;
     };
-  }, [fetchLeadProduction, lead._id, lead.status, reset]);
+  }, [fetchLeadProduction, lead._id, lead.status, lead.typesOfEvent, lead.customer?.venueName, reset]);
 
-  useEffect(() => {
-    if (!selectedSheet || selectedSheet.leadId !== lead._id) return;
-
-    const nextSheet = ensureRenderableSheet(selectedSheet);
-    setSheet(nextSheet);
-    sheetRef.current = nextSheet;
-  }, [selectedSheet, lead._id]);
-
-  const setLocalSheet = (updater: (current: LeadProductionSheet) => LeadProductionSheet) => {
+  const setLocalSheet = (updater: (current: LeadProductionEventSheet) => LeadProductionEventSheet) => {
     setSheet((current) => {
+      if (!current) return current;
       const next = updater(current);
       sheetRef.current = next;
+      const key = eventKey(next.eventName, next.eventDate);
+      setEventSheets((sheets) => {
+        const updated = sheets.map((entry) => eventKey(entry.eventName, entry.eventDate) === key ? next : entry);
+        eventSheetsRef.current = updated;
+        return updated;
+      });
       return next;
     });
   };
 
-  const persistSheet = async (nextSheet?: LeadProductionSheet) => {
-    const sheetToSave = nextSheet ?? sheetRef.current;
-    const saved = await saveLeadProduction(lead._id, toPayload(sheetToSave));
+  const persistSheet = async (nextSheet?: LeadProductionEventSheet) => {
+    if (!sheetRef.current) return;
+    const currentKey = eventKey((nextSheet ?? sheetRef.current).eventName, (nextSheet ?? sheetRef.current).eventDate);
+    const sheetsToSave = nextSheet
+      ? eventSheetsRef.current.map((entry) => eventKey(entry.eventName, entry.eventDate) === currentKey ? nextSheet : entry)
+      : eventSheetsRef.current;
+    const saved = await saveLeadProduction(lead._id, toPayload(sheetsToSave));
 
     if (saved) {
-      const normalized = ensureRenderableSheet(saved);
+      const normalizedSheets = getLeadEventSheets(saved.eventSheets);
+      const normalized = normalizedSheets.find((entry) => eventKey(entry.eventName, entry.eventDate) === currentKey) ?? null;
+      setEventSheets(normalizedSheets);
+      eventSheetsRef.current = normalizedSheets;
       setSheet(normalized);
       sheetRef.current = normalized;
     }
   };
 
-  const updateDate = (field: keyof LeadProductionSheet['dates'], value: string) => {
+  const updateDate = (field: keyof LeadProductionEventSheet['dates'], value: string) => {
     setLocalSheet((current) => ({
       ...current,
       dates: {
@@ -196,9 +241,11 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   };
 
   const addProduction = async () => {
+    const currentSheet = sheetRef.current;
+    if (!currentSheet) return;
     const nextSheet = {
-      ...sheetRef.current,
-      productions: [...sheetRef.current.productions, createEmptyGroup()],
+      ...currentSheet,
+      productions: [...currentSheet.productions, createEmptyGroup()],
     };
     setSheet(nextSheet);
     sheetRef.current = nextSheet;
@@ -206,9 +253,11 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   };
 
   const removeProduction = async (groupIndex: number) => {
+    const currentSheet = sheetRef.current;
+    if (!currentSheet) return;
     const nextSheet = {
-      ...sheetRef.current,
-      productions: sheetRef.current.productions.filter((_, index) => index !== groupIndex),
+      ...currentSheet,
+      productions: currentSheet.productions.filter((_, index) => index !== groupIndex),
     };
     setSheet(nextSheet);
     sheetRef.current = nextSheet;
@@ -216,9 +265,11 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   };
 
   const addItem = async (groupIndex: number) => {
+    const currentSheet = sheetRef.current;
+    if (!currentSheet) return;
     const nextSheet = {
-      ...sheetRef.current,
-      productions: sheetRef.current.productions.map((group, index) =>
+      ...currentSheet,
+      productions: currentSheet.productions.map((group, index) =>
         index === groupIndex
           ? { ...group, items: [...group.items, createEmptyItem()] }
           : group
@@ -230,9 +281,11 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   };
 
   const removeItem = async (groupIndex: number, itemIndex: number) => {
+    const currentSheet = sheetRef.current;
+    if (!currentSheet) return;
     const nextSheet = {
-      ...sheetRef.current,
-      productions: sheetRef.current.productions.map((group, index) => {
+      ...currentSheet,
+      productions: currentSheet.productions.map((group, index) => {
         if (index !== groupIndex) return group;
 
         const nextItems = group.items.filter((_, itemIdx) => itemIdx !== itemIndex);
@@ -248,13 +301,14 @@ export function ProductionTable({ lead }: ProductionTableProps) {
   };
 
   const groupedRows = useMemo(() => {
-    return sheet.productions.map((group) => ({
+    return (sheet?.productions ?? []).map((group) => ({
       ...group,
       items: group.items.length > 0 ? group.items : [createEmptyItem()],
     }));
   }, [sheet]);
 
   const handleDownloadPdf = async () => {
+    if (!sheetRef.current) return;
     try {
       setPdfGenerating(true);
       await downloadProductionPdf({
@@ -287,24 +341,55 @@ export function ProductionTable({ lead }: ProductionTableProps) {
     );
   }
 
+  if (!sheet) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Production</CardTitle></CardHeader>
+        <CardContent className="text-sm text-muted-foreground">No scheduled events are available for production planning.</CardContent>
+      </Card>
+    );
+  }
+
+  const handleEventChange = (value: string) => {
+    const nextSheet = eventSheets.find((entry) => eventKey(entry.eventName, entry.eventDate) === value);
+    if (!nextSheet) return;
+    setSelectedEventKey(value);
+    setSheet(nextSheet);
+    sheetRef.current = nextSheet;
+  };
+
   return (
     <Card>
       <CardHeader className="flex flex-row items-center justify-between gap-3">
         <CardTitle>Production</CardTitle>
-        <Button
-          type="button"
-          size="sm"
-          variant="outline"
-          onClick={handleDownloadPdf}
-          disabled={pdfGenerating}
-        >
-          {pdfGenerating ? (
-            <Loader2 className="mr-1 h-4 w-4 animate-spin" />
-          ) : (
-            <Download className="mr-1 h-4 w-4" />
-          )}
-          Download PDF
-        </Button>
+        <div className="flex items-center gap-2">
+          <Select value={eventKey(sheet.eventName, sheet.eventDate)} onValueChange={handleEventChange}>
+            <SelectTrigger className="w-[220px]">
+              <SelectValue placeholder="Select event" />
+            </SelectTrigger>
+            <SelectContent>
+              {eventSheets.map((eventSheet) => (
+                <SelectItem key={eventKey(eventSheet.eventName, eventSheet.eventDate)} value={eventKey(eventSheet.eventName, eventSheet.eventDate)}>
+                  {eventSheet.eventName} — {toDateInputValue(eventSheet.eventDate)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          <Button
+            type="button"
+            size="sm"
+            variant="outline"
+            onClick={handleDownloadPdf}
+            disabled={pdfGenerating}
+          >
+            {pdfGenerating ? (
+              <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+            ) : (
+              <Download className="mr-1 h-4 w-4" />
+            )}
+            Download PDF
+          </Button>
+        </div>
       </CardHeader>
       <CardContent>
         <ScrollArea className="w-full whitespace-nowrap">
