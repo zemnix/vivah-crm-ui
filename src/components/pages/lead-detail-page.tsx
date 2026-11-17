@@ -20,7 +20,8 @@ import { useNavigate, useParams } from "react-router-dom";
 import { Skeleton } from "@/components/ui/skeleton";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import type { LeadStatus } from "@/api/leadApi";
-import { useToast } from "@/hooks/use-toast";
+import { useToast, toast as notify } from "@/hooks/use-toast";
+import { getLeadConversionWarning } from "@/lib/lead-conversion";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { DeleteConfirmationDialog } from "@/components/dialogs/delete-confirmation-dialog";
 import { AssignLeadDialog } from "@/components/dialogs/assign-lead-dialog";
@@ -28,6 +29,7 @@ import { LeadEditDialog } from "@/components/dialogs/lead-edit-dialog";
 import { ClientProgressionTable } from "@/components/client-progression-table";
 import { SiteInspectionTable } from "@/components/site-inspection-table";
 import { ProductionTable } from "@/components/production-table";
+import { VendorChecklistTable } from "@/components/vendor-checklist-table";
 
 interface LeadDetailPageProps {
   readonly userRole: 'admin' | 'staff';
@@ -156,6 +158,12 @@ export default function LeadDetailPage({
 
   const handleStatusChange = async (newStatus: LeadStatus) => {
     if (!lead) return;
+
+    const conversionWarning = getLeadConversionWarning(newStatus, lead.typesOfEvent, lead.status);
+    if (conversionWarning) {
+      notify.warning(conversionWarning);
+      return;
+    }
 
     const { success, error: optError } = await updateLeadStatusOptimistic(lead._id, newStatus);
 
@@ -806,6 +814,9 @@ export default function LeadDetailPage({
             )}
             {lead && ['converted', 'completed'].includes(lead.status) && (
               <ProductionTable lead={lead} />
+            )}
+            {lead && ['converted', 'completed'].includes(lead.status) && (
+              <VendorChecklistTable key={lead._id} lead={lead} />
             )}
 
           </div>

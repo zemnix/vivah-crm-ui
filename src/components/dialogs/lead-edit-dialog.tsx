@@ -19,6 +19,15 @@ import { useSourceStore } from "@/store/sourceStore";
 import type { Lead, LeadUpdateData } from "@/api/leadApi";
 import { useEffect, useState, useMemo } from "react";
 import { Loader, Plus, X } from "lucide-react";
+import { toast } from "@/hooks/use-toast";
+import { getLeadConversionWarning } from "@/lib/lead-conversion";
+import {
+  eventDateOnlyToLocalDate,
+  localDateToEventDateOnly,
+  serializeIndiaEventDate,
+  todayInIndia,
+  toIndiaEventDateOnly,
+} from "@/lib/event-date";
 
 // Customer schema
 const customerSchema = z.object({
@@ -44,6 +53,7 @@ const createLeadEditSchema = () => {
       z.object({
         name: z.string().min(1, "Event name is required"),
         date: z.string().optional().or(z.literal("")),
+        _originalDate: z.string().optional(),
         eventVenue: z.string().max(200, "Event venue must be less than 200 characters").optional().or(z.literal("")),
         dayNight: z.enum(['day', 'night', 'both']),
         numberOfGuests: z.number().min(1, "Number of guests must be at least 1"),
@@ -188,20 +198,10 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
 
       // Convert typesOfEvent dates to YYYY-MM-DD format
       const typesOfEvent = lead.typesOfEvent?.map(event => {
-        let eventDate = "";
-        if (event.date) {
-          try {
-            const date = new Date(event.date);
-            if (!isNaN(date.getTime())) {
-              eventDate = date.toISOString().split('T')[0];
-            }
-          } catch (e) {
-            // If date parsing fails, leave empty
-          }
-        }
         return {
           name: event.name || "",
-          date: eventDate,
+          date: toIndiaEventDateOnly(event.date),
+          _originalDate: event.date,
           eventVenue: event.eventVenue || "",
           dayNight: (event.dayNight || 'both') as 'day' | 'night' | 'both',
           numberOfGuests: event.numberOfGuests || 0,
@@ -288,6 +288,12 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
   const onSubmit = async (data: LeadEditForm) => {
     if (!user || !lead) return;
 
+    const conversionWarning = getLeadConversionWarning(data.status, data.typesOfEvent, lead.status);
+    if (conversionWarning) {
+      toast.warning(conversionWarning);
+      return;
+    }
+
     setIsSubmitting(true);
     
     try {
@@ -311,13 +317,17 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
       };
 
       // Prepare typesOfEvent - convert dates to ISO strings
-      const typesOfEventData = data.typesOfEvent?.map(event => ({
-        name: event.name,
-        ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
-        ...(event.eventVenue?.trim() ? { eventVenue: event.eventVenue.trim() } : {}),
-        dayNight: event.dayNight,
-        numberOfGuests: event.numberOfGuests,
-      }));
+      const typesOfEventData = data.typesOfEvent?.map(event => {
+        const eventDate = serializeIndiaEventDate(event.date, event._originalDate);
+
+        return {
+          name: event.name,
+          ...(eventDate ? { date: eventDate } : {}),
+          ...(event.eventVenue?.trim() ? { eventVenue: event.eventVenue.trim() } : {}),
+          dayNight: event.dayNight,
+          numberOfGuests: event.numberOfGuests,
+        };
+      });
 
       // Prepare SFX data - convert array to map for backend
       const sfxData: Record<string, string | number | null> = {};
@@ -550,7 +560,7 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                         ...currentEvents,
                         {
                           name: "",
-                          date: new Date().toISOString().split('T')[0],
+                          date: todayInIndia(),
                           eventVenue: "",
                           dayNight: 'both' as const,
                           numberOfGuests: 0,
@@ -626,17 +636,8 @@ export function LeadEditDialog({ open, onOpenChange, lead }: LeadEditDialogProps
                             <FormLabel>Event Date</FormLabel>
                             <FormControl>
                               <DatePicker
-                                date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
-                                onDateChange={(date) => {
-                                  if (date) {
-                                    const year = date.getFullYear();
-                                    const month = String(date.getMonth() + 1).padStart(2, '0');
-                                    const day = String(date.getDate()).padStart(2, '0');
-                                    field.onChange(`${year}-${month}-${day}`);
-                                  } else {
-                                    field.onChange("");
-                                  }
-                                }}
+                                date={eventDateOnlyToLocalDate(field.value)}
+                                onDateChange={(date) => field.onChange(localDateToEventDateOnly(date))}
                                 placeholder="Pick a date"
                                 disabled={isSubmitting || loading}
                               />

@@ -15,6 +15,7 @@ import {
 import type { Lead } from '@/api/leadApi';
 import { Loader2, Plus, Save, Download, Trash2 } from 'lucide-react';
 import { downloadProductionPdf } from '@/services/productionPdfService';
+import { toIndiaEventDateOnly } from '@/lib/event-date';
 
 interface ProductionTableProps {
   lead: Lead;
@@ -370,7 +371,7 @@ export function ProductionTable({ lead }: ProductionTableProps) {
             <SelectContent>
               {eventSheets.map((eventSheet) => (
                 <SelectItem key={eventKey(eventSheet.eventName, eventSheet.eventDate)} value={eventKey(eventSheet.eventName, eventSheet.eventDate)}>
-                  {eventSheet.eventName} — {toDateInputValue(eventSheet.eventDate)}
+                  {eventSheet.eventName} — {toIndiaEventDateOnly(eventSheet.eventDate)}
                 </SelectItem>
               ))}
             </SelectContent>

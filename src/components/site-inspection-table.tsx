@@ -11,6 +11,7 @@ import { getSiteInspectionsByLeadIdApi, saveSiteInspectionApi, type SiteInspecti
 import { uploadFileApi } from '@/api/uploadApi';
 import type { Lead } from '@/api/leadApi';
 import { useToast } from '@/hooks/use-toast';
+import { toIndiaEventDateOnly } from '@/lib/event-date';
 import { ExternalLink, Loader2, Paperclip, Plus, Save, Trash2, Upload, X } from 'lucide-react';
 
 interface SiteInspectionTableProps { lead: Lead }
@@ -164,12 +165,12 @@ export function SiteInspectionTable({ lead }: SiteInspectionTableProps) {
 
   return <Card>
     <CardHeader className="flex flex-row flex-wrap items-center justify-between gap-3"><CardTitle>Site Inspection</CardTitle><div className="flex items-center gap-2">
-      {inspections.length > 1 && <Select value={selectedId} onValueChange={setSelectedId}><SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger><SelectContent>{inspections.map((value) => <SelectItem key={value._id} value={value._id}>{value.event_type} — {dateValue(value.event_date)}</SelectItem>)}</SelectContent></Select>}
+      {inspections.length > 1 && <Select value={selectedId} onValueChange={setSelectedId}><SelectTrigger className="w-[240px]"><SelectValue /></SelectTrigger><SelectContent>{inspections.map((value) => <SelectItem key={value._id} value={value._id}>{value.event_type} — {toIndiaEventDateOnly(value.event_date)}</SelectItem>)}</SelectContent></Select>}
       <Button size="sm" onClick={save} disabled={saving}>{saving ? <Loader2 className="mr-1 h-4 w-4 animate-spin" /> : <Save className="mr-1 h-4 w-4" />}Save</Button>
     </div></CardHeader>
     <CardContent className="space-y-6">
       <div className="grid grid-cols-1 gap-4 rounded-lg border bg-muted/20 p-4 md:grid-cols-2">
-        <Field label="Event Date"><Input type="date" value={dateValue(selected.event_date)} disabled /></Field>
+        <Field label="Event Date"><Input type="date" value={toIndiaEventDateOnly(selected.event_date)} disabled /></Field>
         <Field label="Visited Date"><Input type="date" value={dateValue(selected.visited_date)} onChange={(e) => updateField('visited_date', e.target.value)} className={inputClass} /></Field>
         <Field label="Event Venue"><Input value={selected.event_venue} disabled /></Field>
         <Field label="Visited By"><Input value={selected.visited_by || ''} onChange={(e) => updateField('visited_by', e.target.value)} placeholder="Name of visitor" className={inputClass} /></Field>

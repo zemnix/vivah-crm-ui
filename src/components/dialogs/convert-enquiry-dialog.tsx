@@ -19,6 +19,11 @@ import { useEffect, useState, useMemo } from "react";
 import { useNavigate } from "react-router-dom";
 import { useToast } from "@/hooks/use-toast";
 import { Loader, Plus, X } from "lucide-react";
+import {
+  eventDateOnlyToLocalDate,
+  localDateToEventDateOnly,
+  serializeIndiaEventDate,
+} from "@/lib/event-date";
 
 // Convert enquiry form schema
 // Note: name and numberOfGuests come from enquiry and are read-only
@@ -162,7 +167,7 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
         assignedTo: data.assignedTo || undefined,
         typesOfEvent: data.typesOfEvent.map(event => ({
           name: event.name, // Backend will use enquiry's value, but we send it for matching
-          ...(event.date ? { date: new Date(event.date + 'T00:00:00').toISOString() } : {}),
+          ...(event.date ? { date: serializeIndiaEventDate(event.date)! } : {}),
           ...(event.eventVenue?.trim() ? { eventVenue: event.eventVenue.trim() } : {}),
           dayNight: event.dayNight,
           numberOfGuests: event.numberOfGuests, // Backend will use enquiry's value, but we send it for matching
@@ -340,18 +345,8 @@ export function ConvertEnquiryDialog({ open, onOpenChange, enquiry }: ConvertEnq
                           <FormLabel>Event Date</FormLabel>
                           <FormControl>
                             <DatePicker
-                              date={field.value ? new Date(field.value + 'T00:00:00') : undefined}
-                              onDateChange={(date) => {
-                                // Convert Date to YYYY-MM-DD string format
-                                if (date) {
-                                  const year = date.getFullYear();
-                                  const month = String(date.getMonth() + 1).padStart(2, '0');
-                                  const day = String(date.getDate()).padStart(2, '0');
-                                  field.onChange(`${year}-${month}-${day}`);
-                                } else {
-                                  field.onChange("");
-                                }
-                              }}
+                              date={eventDateOnlyToLocalDate(field.value)}
+                              onDateChange={(date) => field.onChange(localDateToEventDateOnly(date))}
                               placeholder="Pick a date"
                             />
                           </FormControl>

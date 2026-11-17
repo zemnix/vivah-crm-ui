@@ -18,6 +18,13 @@ export default function AdminMasterConfig() {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {[
+            { title: 'Vendor Master', path: '/admin/vendor-config', description: 'Manage independent vendor options for event checklists.' },
+            { title: 'Vendor Name Master', path: '/admin/vendor-name-config', description: 'Manage independent vendor names for event checklists.' },
+          ].map((master) => <Card key={master.path}>
+            <CardHeader><CardTitle>{master.title}</CardTitle><CardDescription>{master.description}</CardDescription></CardHeader>
+            <CardContent><Button className="w-full" variant="outline" onClick={() => navigate(master.path)}>Manage {master.title}</Button></CardContent>
+          </Card>)}
           {/* Baraat Config Card */}
           <Card className="hover:shadow-lg transition-shadow cursor-pointer" onClick={() => navigate('/admin/baraat-config')}>
             <CardHeader>
