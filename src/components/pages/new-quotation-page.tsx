@@ -125,7 +125,7 @@ export default function NewQuotationPage({
 
   const {
     fields: itemFields,
-    append: appendItem,
+    insert: insertItem,
     remove: removeItem,
   } = useFieldArray({
     control: form.control,
@@ -358,17 +358,8 @@ export default function NewQuotationPage({
             </Card>
 
             <Card>
-              <CardHeader className="flex flex-row items-center justify-between">
+              <CardHeader>
                 <CardTitle>Quotation Items</CardTitle>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  onClick={() => appendItem({ category: "", itemName: "", nos: "", price: 0 })}
-                >
-                  <Plus className="h-4 w-4 mr-2" />
-                  Add Row
-                </Button>
               </CardHeader>
               <CardContent className="space-y-4">
                 <div className="overflow-x-auto">
@@ -379,7 +370,7 @@ export default function NewQuotationPage({
                         <TableHead>Item</TableHead>
                         <TableHead>NOS</TableHead>
                         <TableHead>Price</TableHead>
-                        <TableHead className="w-[70px]">Action</TableHead>
+                        <TableHead className="w-[110px]">Action</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -413,15 +404,29 @@ export default function NewQuotationPage({
                             />
                           </TableCell>
                           <TableCell>
-                            <Button
-                              type="button"
-                              variant="ghost"
-                              size="icon"
-                              disabled={itemFields.length <= 1}
-                              onClick={() => removeItem(index)}
-                            >
-                              <Trash2 className="h-4 w-4 text-red-600" />
-                            </Button>
+                            <div className="flex items-center gap-1">
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Add row after row ${index + 1}`}
+                                title="Add row below"
+                                onClick={() => insertItem(index + 1, { category: "", itemName: "", nos: "", price: 0 })}
+                              >
+                                <Plus className="h-4 w-4" />
+                              </Button>
+                              <Button
+                                type="button"
+                                variant="ghost"
+                                size="icon"
+                                aria-label={`Delete row ${index + 1}`}
+                                title="Delete row"
+                                disabled={itemFields.length <= 1}
+                                onClick={() => removeItem(index)}
+                              >
+                                <Trash2 className="h-4 w-4 text-red-600" />
+                              </Button>
+                            </div>
                           </TableCell>
                         </TableRow>
                       ))}
@@ -488,7 +493,7 @@ export default function NewQuotationPage({
                   </div>
                 </div>
                 <div className="space-y-2">
-                  <Label>Comments / Special Instructions</Label>
+                  <Label>Remarks</Label>
                   <Textarea rows={4} {...form.register("notes")} />
                 </div>
               </CardContent>

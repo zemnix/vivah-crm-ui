@@ -230,9 +230,6 @@ const styles = StyleSheet.create({
     borderColor: "#d5dcea",
     minHeight: 28,
   },
-  tableRowAlt: {
-    backgroundColor: "#fbfdff",
-  },
   th: {
     fontFamily: "Helvetica-Bold",
     paddingVertical: 7.5,
@@ -267,19 +264,17 @@ const styles = StyleSheet.create({
     width: "20%",
     textAlign: "right",
   },
-  groupedRow: {
+  groupedItemRow: {
     flexDirection: "row",
     borderLeftWidth: 1,
     borderRightWidth: 1,
-    borderBottomWidth: 1,
     borderColor: "#d5dcea",
+    minHeight: 28,
   },
   categorySpanCell: {
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "center",
     backgroundColor: "#f9f3e7",
-    borderRightWidth: 1,
-    borderColor: "#d5dcea",
   },
   categorySpanText: {
     textAlign: "center",
@@ -288,34 +283,16 @@ const styles = StyleSheet.create({
     fontSize: 9.4,
     color: "#6a4f23",
   },
-  groupedRight: {
-    width: "68%",
-  },
-  groupedInnerRow: {
-    flexDirection: "row",
-    minHeight: 28,
-  },
   groupedInnerRowAlt: {
     backgroundColor: "#fbfdff",
   },
-  groupedInnerRowDivider: {
+  groupedDataCell: {
     borderBottomWidth: 1,
     borderColor: "#d5dcea",
   },
-  colItemInGroup: {
-    width: "47.0588%",
-    borderRightWidth: 1,
+  categoryGroupEnd: {
+    borderBottomWidth: 1,
     borderColor: "#d5dcea",
-  },
-  colNosInGroup: {
-    width: "23.5294%",
-    borderRightWidth: 1,
-    borderColor: "#d5dcea",
-    textAlign: "center",
-  },
-  colPriceInGroup: {
-    width: "29.4118%",
-    textAlign: "right",
   },
   summaryCard: {
     marginTop: 12,
@@ -349,6 +326,11 @@ const styles = StyleSheet.create({
     fontSize: 9.8,
     color: "#374151",
   },
+  summaryChargeLabel: {
+    fontSize: 9.8,
+    color: "#374151",
+    paddingLeft: 5,
+  },
   summaryValue: {
     fontSize: 9.8,
     color: "#111827",
@@ -378,6 +360,11 @@ const styles = StyleSheet.create({
   validityText: {
     fontSize: 9.5,
     color: "#5f6b7d",
+  },
+  remarkText: {
+    marginTop: 12,
+    fontSize: 9.8,
+    color: "#24334e",
   },
   pageFooter: {
     position: "absolute",
@@ -566,31 +553,39 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
         </View>
 
         {groupedRows.length > 0 ? (
-          groupedRows.map((group, groupIndex) => (
-            <View key={`${group.category || "uncategorized"}-${groupIndex}`} style={styles.groupedRow}>
-              <View style={[styles.colParticular, styles.categorySpanCell]}>
-                <Text style={[styles.td, styles.categorySpanText]}>
-                  {group.category ? group.category.toUpperCase() : "-"}
+          groupedRows.flatMap((group, groupIndex) =>
+            group.rows.map((row, rowIndex) => (
+              <View
+                key={`${group.category}-${row.itemName}-${groupIndex}-${rowIndex}`}
+                style={[
+                  styles.groupedItemRow,
+                  ...(rowIndex % 2 === 1 ? [styles.groupedInnerRowAlt] : []),
+                ]}
+                wrap={false}
+              >
+                <View
+                  style={[
+                    styles.colParticular,
+                    styles.categorySpanCell,
+                    ...(rowIndex === group.rows.length - 1 ? [styles.categoryGroupEnd] : []),
+                  ]}
+                >
+                  {rowIndex === 0 ? (
+                    <Text style={[styles.td, styles.categorySpanText]}>
+                      {group.category ? group.category.toUpperCase() : "-"}
+                    </Text>
+                  ) : null}
+                </View>
+                <Text style={[styles.td, styles.colItem, styles.groupedDataCell]}>
+                  {row.itemName.toUpperCase()}
+                </Text>
+                <Text style={[styles.td, styles.colNos, styles.groupedDataCell]}>{row.nos || "-"}</Text>
+                <Text style={[styles.td, styles.colPrice, styles.groupedDataCell]}>
+                  {formatAmount(row.price)}
                 </Text>
               </View>
-              <View style={styles.groupedRight}>
-                {group.rows.map((row, rowIndex) => (
-                  <View
-                    key={`${group.category}-${row.itemName}-${groupIndex}-${rowIndex}`}
-                    style={[
-                      styles.groupedInnerRow,
-                      ...(rowIndex % 2 === 1 ? [styles.groupedInnerRowAlt] : []),
-                      ...(rowIndex < group.rows.length - 1 ? [styles.groupedInnerRowDivider] : []),
-                    ]}
-                  >
-                    <Text style={[styles.td, styles.colItemInGroup]}>{row.itemName.toUpperCase()}</Text>
-                    <Text style={[styles.td, styles.colNosInGroup]}>{row.nos || "-"}</Text>
-                    <Text style={[styles.td, styles.colPriceInGroup]}>{formatAmount(row.price)}</Text>
-                  </View>
-                ))}
-              </View>
-            </View>
-          ))
+            ))
+          )
         ) : (
           <View style={styles.tableRow}>
             <Text style={[styles.td, styles.colParticular]} />
@@ -600,25 +595,20 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
           </View>
         )}
 
-        {(quotation.additionalCharges || []).map((charge, index) => (
-          <View key={`${charge.name}-${index}`} style={[styles.tableRow, ...(index % 2 === 0 ? [styles.tableRowAlt] : [])]}>
-            <Text style={[styles.td, styles.colParticular]} />
-            <Text style={[styles.td, styles.colItem]}>{charge.name}</Text>
-            <Text style={[styles.td, styles.colNos]}>-</Text>
-            <Text style={[styles.td, styles.colPrice]}>{formatAmount(Number(charge.amount) || 0)}</Text>
-          </View>
-        ))}
-
         <View style={styles.summaryCard}>
           <Text style={styles.summaryHeader}>SUMMARY</Text>
           <View style={styles.summaryRow}>
             <Text style={styles.summaryLabel}>Items Total</Text>
             <Text style={styles.summaryValue}>{formatAmount(itemsTotal)}</Text>
           </View>
-          <View style={styles.summaryRow}>
-            <Text style={styles.summaryLabel}>Additional Charges</Text>
-            <Text style={styles.summaryValue}>{formatAmount(additionalChargesTotal)}</Text>
-          </View>
+          {(quotation.additionalCharges || []).map((charge, index) => (
+            <View key={`${charge.name}-${index}`} style={styles.summaryRow}>
+              <Text style={styles.summaryChargeLabel}>
+                - {(charge.name || "Charge").trim() || "Charge"}
+              </Text>
+              <Text style={styles.summaryValue}>{formatAmount(Number(charge.amount) || 0)}</Text>
+            </View>
+          ))}
           <View style={[styles.summaryRow, styles.summaryGrand]}>
             <Text style={styles.summaryGrandText}>Grand Total</Text>
             <Text style={styles.summaryGrandText}>{formatAmount(grandTotal)}</Text>
@@ -626,9 +616,9 @@ const QuotationDocument: React.FC<Readonly<QuotationDocumentProps>> = ({ quotati
         </View>
 
         <View style={styles.finalNotes}>
-          <Text style={styles.amountWords}>In Words: {amountInWords(grandTotal)}</Text>
           <Text style={styles.validityText}>Validity: {safeDate(quotation.validityDate)}</Text>
-          {quotation.notes ? <Text style={[styles.validityText, { marginTop: 3 }]}>Note: {quotation.notes}</Text> : null}
+          <Text style={[styles.amountWords, { marginTop: 3 }]}>In Words: {amountInWords(grandTotal)}</Text>
+          {quotation.notes ? <Text style={styles.remarkText}>Remark: {quotation.notes}</Text> : null}
         </View>
       </Page>
     </Document>
